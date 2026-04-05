@@ -1,0 +1,437 @@
+/* ============================================================
+   SoundReminder - Dark Theme Stylesheet
+   Modern, clean, flat design. NO animations or transitions.
+   ============================================================ */
+
+/* --- Root / Global --- */
+.root {
+    -fx-background-color: #1E1E1E;
+    -fx-text-fill: #E0E0E0;
+    -fx-font-family: "Segoe UI", "DejaVu Sans", "Arial", sans-serif;
+    -fx-font-size: 13px;
+}
+
+/* --- Tab Pane --- */
+.main-tab-pane {
+    -fx-background-color: #1E1E1E;
+    -fx-tab-min-width: 180px;
+    -fx-tab-max-width: 220px;
+}
+
+.main-tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #2D2D2D;
+    -fx-border-color: #3D3D3D;
+    -fx-border-width: 0 0 1 0;
+}
+
+.main-tab-pane .tab {
+    -fx-background-color: #2D2D2D;
+    -fx-padding: 8 20 8 20;
+    -fx-background-radius: 0;
+}
+
+.main-tab-pane .tab:selected {
+    -fx-background-color: #1E1E1E;
+    -fx-border-color: #0078D4;
+    -fx-border-width: 0 0 2 0;
+}
+
+.main-tab-pane .tab .tab-label {
+    -fx-text-fill: #B0B0B0;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.main-tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #E0E0E0;
+}
+
+/* --- Tab Content --- */
+.tab-content {
+    -fx-background-color: #1E1E1E;
+    -fx-spacing: 16;
+}
+
+/* --- Input Section --- */
+.input-section {
+    -fx-background-color: #2D2D2D;
+    -fx-padding: 16;
+    -fx-background-radius: 4;
+}
+
+/* --- Labels --- */
+.field-label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-min-width: 80px;
+}
+
+.section-label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 4 0;
+}
+
+/* --- DatePicker --- */
+.date-picker {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+}
+
+.date-picker .arrow-button {
+    -fx-background-color: #3D3D3D;
+}
+
+.date-picker .text-field {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+}
+
+.date-picker-popup .month-year-pane {
+    -fx-background-color: #2D2D2D;
+}
+
+.date-picker-popup .calendar-grid {
+    -fx-background-color: #2D2D2D;
+}
+
+/* --- Time Picker (ComboBox) --- */
+.time-picker {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+}
+
+.time-picker .text-field {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+}
+
+/* --- TextArea --- */
+.message-area {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+    -fx-border-color: #4D4D4D;
+    -fx-border-width: 1;
+    -fx-border-radius: 2;
+    -fx-padding: 8;
+}
+
+.message-area .content {
+    -fx-background-color: #3D3D3D;
+}
+
+/* --- Attached Image Label --- */
+.attached-image-label {
+    -fx-text-fill: #808080;
+    -fx-font-size: 12px;
+    -fx-ellipsis-string: "...";
+}
+
+/* --- Buttons --- */
+.btn-primary {
+    -fx-background-color: #0078D4;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 20 8 20;
+    -fx-background-radius: 2;
+    -fx-cursor: hand;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1A86D9;
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #006CBE;
+}
+
+.btn-secondary {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 13px;
+    -fx-padding: 8 16 8 16;
+    -fx-background-radius: 2;
+    -fx-border-color: #4D4D4D;
+    -fx-border-width: 1;
+    -fx-border-radius: 2;
+    -fx-cursor: hand;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #4D4D4D;
+}
+
+.btn-secondary:pressed {
+    -fx-background-color: #2D2D2D;
+}
+
+.btn-delete {
+    -fx-background-color: #C42B1C;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 12px;
+    -fx-padding: 6 12 6 12;
+    -fx-background-radius: 2;
+    -fx-cursor: hand;
+}
+
+.btn-delete:hover {
+    -fx-background-color: #D13421;
+}
+
+.btn-delete:pressed {
+    -fx-background-color: #A4262C;
+}
+
+/* --- ListView --- */
+.reminders-list {
+    -fx-background-color: #2D2D2D;
+    -fx-border-color: #3D3D3D;
+    -fx-border-width: 1;
+    -fx-border-radius: 2;
+    -fx-control-inner-background: #2D2D2D;
+    -fx-control-inner-background-alt: #333333;
+}
+
+.reminders-list .list-cell {
+    -fx-background-color: #2D2D2D;
+    -fx-text-fill: #E0E0E0;
+    -fx-padding: 4 0 4 0;
+}
+
+.reminders-list .list-cell:filled:selected {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+}
+
+.reminders-list .list-cell:filled:hover {
+    -fx-background-color: #383838;
+}
+
+.reminders-list .list-cell:empty {
+    -fx-background-color: #2D2D2D;
+}
+
+/* --- Reminder List Cell Labels --- */
+.reminder-time-label {
+    -fx-text-fill: #0078D4;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.reminder-message-label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 13px;
+}
+
+/* --- Timer Specific Labels --- */
+.timer-remaining-label {
+    -fx-text-fill: #FFB900;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+}
+
+.time-unit-label {
+    -fx-text-fill: #B0B0B0;
+    -fx-font-size: 13px;
+}
+
+/* --- Timer Spinner --- */
+.timer-spinner {
+    -fx-background-color: #3D3D3D;
+}
+
+.timer-spinner .text-field {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+    -fx-alignment: center;
+}
+
+.timer-spinner .increment-arrow-button,
+.timer-spinner .decrement-arrow-button {
+    -fx-background-color: #4D4D4D;
+}
+
+/* --- Notification Window --- */
+.notification-root {
+    -fx-background-color: #2D2D2D;
+    -fx-border-color: #0078D4;
+    -fx-border-width: 2;
+    -fx-effect: null;
+}
+
+.notification-message {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-wrap-text: true;
+}
+
+.notification-done-checkbox {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.notification-done-checkbox .box {
+    -fx-background-color: #3D3D3D;
+    -fx-border-color: #4D4D4D;
+    -fx-border-width: 1;
+}
+
+.notification-done-checkbox:selected .mark {
+    -fx-background-color: #0078D4;
+}
+
+/* --- Settings Dialog --- */
+.settings-dialog {
+    -fx-background-color: #1E1E1E;
+}
+
+.sound-path-label {
+    -fx-text-fill: #B0B0B0;
+    -fx-font-size: 12px;
+}
+
+/* --- Volume Slider --- */
+.volume-slider .track {
+    -fx-background-color: #4D4D4D;
+    -fx-background-radius: 2;
+    -fx-pref-height: 6;
+}
+
+.volume-slider .thumb {
+    -fx-background-color: #0078D4;
+    -fx-background-radius: 8;
+    -fx-pref-width: 16;
+    -fx-pref-height: 16;
+}
+
+.volume-value-label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-alignment: center-right;
+}
+
+/* --- Main Toolbar --- */
+.main-toolbar {
+    -fx-background-color: #2D2D2D;
+    -fx-border-color: #3D3D3D;
+    -fx-border-width: 0 0 1 0;
+}
+
+.status-label {
+    -fx-text-fill: #808080;
+    -fx-font-size: 12px;
+}
+
+/* --- Separator --- */
+.separator .line {
+    -fx-border-color: #3D3D3D;
+    -fx-border-width: 1;
+}
+
+/* --- ScrollBar --- */
+.scroll-bar {
+    -fx-background-color: #1E1E1E;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #5D5D5D;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #6D6D6D;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: #1E1E1E;
+    -fx-padding: 0;
+}
+
+/* --- Tooltip --- */
+.tooltip {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 12px;
+    -fx-background-radius: 2;
+}
+
+/* --- Alert Dialog --- */
+.dialog-pane {
+    -fx-background-color: #1E1E1E;
+}
+
+.dialog-pane .label {
+    -fx-text-fill: #E0E0E0;
+}
+
+.dialog-pane .button {
+    -fx-background-color: #3D3D3D;
+    -fx-text-fill: #E0E0E0;
+    -fx-border-color: #4D4D4D;
+    -fx-border-width: 1;
+    -fx-padding: 6 16 6 16;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: #4D4D4D;
+}
+
+.dialog-pane .button:default {
+    -fx-background-color: #0078D4;
+    -fx-text-fill: #FFFFFF;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #2D2D2D;
+}
+
+.dialog-pane .header-panel .label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+/* --- File Chooser --- */
+.file-chooser {
+    -fx-background-color: #1E1E1E;
+}
+
+/* --- MenuBar / ContextMenu (for tray alternative) --- */
+.context-menu {
+    -fx-background-color: #2D2D2D;
+    -fx-border-color: #3D3D3D;
+    -fx-border-width: 1;
+}
+
+.context-menu .menu-item {
+    -fx-background-color: #2D2D2D;
+    -fx-text-fill: #E0E0E0;
+}
+
+.context-menu .menu-item:hover {
+    -fx-background-color: #3D3D3D;
+}
+
+/* --- Checkbox (general) --- */
+.check-box .box {
+    -fx-background-color: #3D3D3D;
+    -fx-border-color: #4D4D4D;
+    -fx-border-width: 1;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: #0078D4;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #3D3D3D;
+    -fx-border-color: #0078D4;
+}

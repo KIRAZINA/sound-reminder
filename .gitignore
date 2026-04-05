@@ -1,0 +1,81 @@
+# Compiled class / module files
+*.class
+
+# Packaged files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+out/
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Qwen Code ###
+.qwen/
+
+### Mac OS ###
+.DS_Store
+
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+### OS ###
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+### Application data (user home, not in repo)
+# These are created at runtime in ~/.soundreminder/
+# Do not include in repository
+
+### Logs ###
+*.log
+
+### JLink / JPackage output ###
+build/installer/
+jpackage-output/
+
+### Temporary files ###
+*.tmp
+*.bak
+*.swp
+*~
