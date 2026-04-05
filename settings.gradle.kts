@@ -11,4 +11,3 @@ plugins {
 }
 
 rootProject.name = "SoundReminder"
-include("app")
