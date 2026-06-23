@@ -57,7 +57,7 @@ public class ScheduledReminderTab extends Tab {
     private ComboBox<LocalTime> timePicker;
     private TextArea messageArea;
     private Label attachedImageLabel;
-    private Path selectedImagePath;
+    private String selectedImagePath;
     private Button attachImageButton;
     private Button addReminderButton;
     private ListView<Reminder> remindersList;
@@ -219,11 +219,9 @@ public class ScheduledReminderTab extends Tab {
         File selected = fileChooser.showOpenDialog(remindersList.getScene().getWindow());
         if (selected != null && selected.exists()) {
             try {
-                // Copy image to app storage
-                Path copied = storageService.copyImageToStorage(selected.toPath());
-                selectedImagePath = copied;
+                selectedImagePath = storageService.copyImageToStorage(selected.toPath());
                 attachedImageLabel.setText("Attached: " + selected.getName());
-                LOGGER.info("Image attached: " + copied);
+                LOGGER.info("Image attached: " + selectedImagePath);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to attach image", e);
                 showAlert("Error", "Failed to attach image: " + e.getMessage());
@@ -265,7 +263,7 @@ public class ScheduledReminderTab extends Tab {
                 ReminderType.SCHEDULED,
                 triggerTime,
                 message,
-                selectedImagePath != null ? selectedImagePath.toString() : null
+                selectedImagePath
         );
 
         // Add to shared list
@@ -355,9 +353,9 @@ public class ScheduledReminderTab extends Tab {
                     // Load thumbnail if image exists
                     if (reminder.getImagePath() != null && !reminder.getImagePath().isBlank()) {
                         try {
-                            File imgFile = new File(reminder.getImagePath());
-                            if (imgFile.exists()) {
-                                Image img = new Image(imgFile.toURI().toString(), 40, 40,
+                            Path resolved = storageService.resolveImagePath(reminder.getImagePath());
+                            if (resolved != null && resolved.toFile().exists()) {
+                                Image img = new Image(resolved.toUri().toString(), 40, 40,
                                         true, true);
                                 thumbnail.setImage(img);
                                 thumbnail.setVisible(true);

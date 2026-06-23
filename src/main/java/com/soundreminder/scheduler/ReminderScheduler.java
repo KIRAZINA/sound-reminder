@@ -2,10 +2,12 @@ package com.soundreminder.scheduler;
 
 import com.soundreminder.model.Reminder;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,8 +30,11 @@ public class ReminderScheduler {
     /** Callback invoked when a reminder fires. Receives the Reminder as argument. */
     private final Consumer<Reminder> onReminderFired;
 
-    /** Flag to prevent scheduling while a reschedule is in progress. */
-    private final AtomicBoolean scheduling = new AtomicBoolean(false);
+    /** Lock to serialize concurrent scheduling recalculations. */
+    private final ReentrantLock schedulingLock = new ReentrantLock();
+
+    /** Currently scheduled future task, cancelled before scheduling a new one to prevent duplicates. */
+    private ScheduledFuture<?> scheduledFuture;
 
     /**
      * Creates a new ReminderScheduler.
@@ -72,9 +77,29 @@ public class ReminderScheduler {
     }
 
     /**
+     * Replaces a reminder in the scheduling queue with an updated version (e.g., after snooze).
+     * Removes the old entry, adds the updated one, and recalculates scheduling.
+     *
+     * @param reminder the updated reminder to re-schedule
+     */
+    public synchronized void reSchedule(Reminder reminder) {
+        reminderQueue.removeIf(r -> r.getId().equals(reminder.getId()));
+        if (reminder.isActive() && !reminder.isDone()) {
+            reminderQueue.add(reminder);
+            LOGGER.info("Re-scheduled reminder: " + reminder.getMessage() +
+                    " at " + reminder.getTriggerTime());
+        }
+        recalculateScheduling();
+    }
+
+    /**
      * Removes all reminders from the queue and cancels any pending scheduled tasks.
      */
     public synchronized void clear() {
+        if (scheduledFuture != null && !scheduledFuture.isDone()) {
+            scheduledFuture.cancel(false);
+            scheduledFuture = null;
+        }
         reminderQueue.clear();
         LOGGER.info("Cleared all scheduled reminders");
     }
@@ -101,48 +126,68 @@ public class ReminderScheduler {
      * When it fires, this method is called again to schedule the next one.
      */
     private void recalculateScheduling() {
-        if (scheduling.compareAndSet(false, true)) {
-            try {
-                Reminder nextReminder = reminderQueue.peek();
-                if (nextReminder == null) {
-                    LOGGER.fine("No reminders to schedule");
-                    return;
-                }
+        schedulingLock.lock();
+        try {
+            // Cancel any previously scheduled task to prevent duplicates
+            if (scheduledFuture != null && !scheduledFuture.isDone()) {
+                scheduledFuture.cancel(false);
+            }
+            scheduledFuture = null;
 
-                java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                if (!nextReminder.isActive()) {
-                    // Remove inactive reminder and try next
-                    reminderQueue.poll();
+            Reminder nextReminder = reminderQueue.peek();
+            if (nextReminder == null) {
+                LOGGER.fine("No reminders to schedule");
+                return;
+            }
+
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            if (!nextReminder.isActive()) {
+                reminderQueue.poll();
+                recalculateScheduling();
+                return;
+            }
+
+            long delayMillis = java.time.Duration.between(now, nextReminder.getTriggerTime()).toMillis();
+
+            if (delayMillis <= 0) {
+                LOGGER.info("Firing reminder immediately: " + nextReminder.getMessage());
+                reminderQueue.poll();
+                onReminderFired.accept(nextReminder);
+                rescheduleIfRecurring(nextReminder);
+                recalculateScheduling();
+            } else {
+                LOGGER.info("Scheduling next reminder in " + delayMillis + "ms: " +
+                        nextReminder.getMessage());
+                scheduledFuture = executor.schedule(() -> {
+                    Reminder fired = reminderQueue.poll();
+                    if (fired != null && fired.isActive()) {
+                        LOGGER.info("Firing scheduled reminder: " + fired.getMessage());
+                        onReminderFired.accept(fired);
+                        rescheduleIfRecurring(fired);
+                    }
                     recalculateScheduling();
-                    return;
-                }
+                }, delayMillis, TimeUnit.MILLISECONDS);
+            }
+        } finally {
+            schedulingLock.unlock();
+        }
+    }
 
-                long delayMillis = java.time.Duration.between(now, nextReminder.getTriggerTime()).toMillis();
-
-                if (delayMillis <= 0) {
-                    // Already past trigger time - fire immediately
-                    LOGGER.info("Firing reminder immediately: " + nextReminder.getMessage());
-                    reminderQueue.poll(); // Remove from queue
-                    onReminderFired.accept(nextReminder);
-                    // Recalculate for remaining reminders
-                    recalculateScheduling();
-                } else {
-                    // Schedule for the future
-                    LOGGER.info("Scheduling next reminder in " + delayMillis + "ms: " +
-                            nextReminder.getMessage());
-                    executor.schedule(() -> {
-                        // Fire the reminder and remove from queue
-                        Reminder fired = reminderQueue.poll();
-                        if (fired != null && fired.isActive()) {
-                            LOGGER.info("Firing scheduled reminder: " + fired.getMessage());
-                            onReminderFired.accept(fired);
-                        }
-                        // Schedule the next reminder in queue
-                        recalculateScheduling();
-                    }, delayMillis, TimeUnit.MILLISECONDS);
-                }
-            } finally {
-                scheduling.set(false);
+    /**
+     * If the fired reminder is recurring and has not been manually deactivated,
+     * computes its next occurrence and re-adds it to the scheduling queue.
+     */
+    private void rescheduleIfRecurring(Reminder fired) {
+        if (fired.isRecurring() && !fired.isDone()) {
+            fired.setLastFiredAt(java.time.LocalDateTime.now());
+            LocalDateTime next = fired.computeNextOccurrence();
+            if (next != null) {
+                fired.setTriggerTime(next);
+                fired.setActive(true);
+                fired.setDone(false);
+                reminderQueue.add(fired);
+                LOGGER.info("Recurring reminder rescheduled: " + fired.getMessage() +
+                        " next at " + next);
             }
         }
     }

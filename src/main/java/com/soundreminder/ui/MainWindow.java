@@ -1,11 +1,13 @@
 package com.soundreminder.ui;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.logging.Logger;
 
 import com.soundreminder.model.AppSettings;
@@ -214,27 +216,34 @@ public class MainWindow {
     private void loadSavedReminders() {
         List<Reminder> saved = storageService.loadReminders();
         LocalDateTime now = LocalDateTime.now();
+        List<Reminder> overdue = new ArrayList<>();
 
         for (Reminder reminder : saved) {
             if (reminder.isActive() && !reminder.isDone()) {
-                // Only schedule if trigger time is in the future
+                allReminders.add(reminder);
                 if (reminder.getTriggerTime().isAfter(now)) {
-                    allReminders.add(reminder);
                     scheduler.schedule(reminder);
                 } else {
-                    // Past-due reminder: fire immediately
-                    allReminders.add(reminder);
-                    onReminderFired(reminder);
+                    overdue.add(reminder);
                 }
             }
         }
 
         LOGGER.info("Loaded " + saved.size() + " reminders, " +
-                allReminders.size() + " active");
+                allReminders.size() + " active (" + overdue.size() + " overdue)");
+
+        // Stagger overdue reminders 1 second apart to prevent UI flooding
+        for (int i = 0; i < overdue.size(); i++) {
+            final Reminder r = overdue.get(i);
+            executorService.schedule(() -> onReminderFired(r),
+                    i * 1L, TimeUnit.SECONDS);
+        }
 
         // Refresh both tabs
-        scheduledTab.refreshList();
-        countdownTab.refreshList();
+        Platform.runLater(() -> {
+            scheduledTab.refreshList();
+            countdownTab.refreshList();
+        });
     }
 
     /**
@@ -259,8 +268,9 @@ public class MainWindow {
             // Start the alarm sound
             soundManager.startAlarm();
 
-            // Show notification
-            activeNotification = new NotificationWindow(soundManager, storageService, this::onReminderDone);
+            // Show notification (with snooze and recurring support)
+            activeNotification = new NotificationWindow(soundManager, storageService,
+                    this::onReminderDone, this::onSnoozeReminder);
             activeNotification.show(reminder);
 
             // Show system tray notification
@@ -310,7 +320,8 @@ public class MainWindow {
                             // Re-show notification
                             if (activeNotification == null || !activeNotification.isShowing()) {
                                 activeNotification = new NotificationWindow(
-                                        soundManager, storageService, this::onReminderDone);
+                                        soundManager, storageService,
+                                        this::onReminderDone, this::onSnoozeReminder);
                                 activeNotification.show(reminder);
                             }
 
@@ -324,10 +335,11 @@ public class MainWindow {
     }
 
     /**
-     * Callback invoked when the user marks a reminder as done.
-     * Stops all replay/sound activity and removes the reminder from active lists.
+     * Callback invoked when the user marks a reminder as done or acknowledges a recurring reminder.
+     * For non-recurring or "Stop Recurring", removes the reminder from active lists and cancels
+     * scheduling. For recurring "Acknowledge", the reminder stays active so the next occurrence fires.
      *
-     * @param reminder the reminder that was marked as done
+     * @param reminder the reminder that was acted on
      */
     private void onReminderDone(Reminder reminder) {
         LOGGER.info("Reminder done: " + reminder.getId());
@@ -339,11 +351,7 @@ public class MainWindow {
             replayCount = 0;
         }
 
-        // Remove from active list
-        allReminders.removeIf(r -> r.getId().equals(reminder.getId()));
-        storageService.saveReminders(allReminders);
-
-        // Stop sound (done by NotificationWindow, but ensure)
+        // Stop sound
         soundManager.stopAlarm();
 
         // Hide notification
@@ -352,8 +360,47 @@ public class MainWindow {
             activeNotification = null;
         }
 
-        // Cancel from scheduler
-        scheduler.cancel(reminder.getId());
+        if (reminder.isDone()) {
+            // Non-recurring "Mark as Done" or "Stop Recurring": remove from active list
+            allReminders.removeIf(r -> r.getId().equals(reminder.getId()));
+            scheduler.cancel(reminder.getId());
+        }
+        // Recurring "Acknowledge": reminder stays in list, scheduler already has next occurrence
+
+        storageService.saveReminders(allReminders);
+
+        // Refresh UI
+        Platform.runLater(() -> {
+            scheduledTab.refreshList();
+            countdownTab.refreshList();
+        });
+    }
+
+    /**
+     * Callback invoked when the user snoozes a reminder.
+     * Updates the reminder's trigger time and re-schedules it.
+     *
+     * @param reminder the reminder being snoozed
+     * @param seconds  the number of seconds to snooze for
+     */
+    private void onSnoozeReminder(Reminder reminder, long seconds) {
+        LOGGER.info("Snoozing reminder " + reminder.getId() + " for " + seconds + "s");
+
+        LocalDateTime newTime = LocalDateTime.now().plusSeconds(seconds);
+        reminder.snoozeUntil(newTime);
+
+        // Re-schedule with updated trigger time
+        scheduler.reSchedule(reminder);
+
+        // Save state
+        storageService.saveReminders(allReminders);
+
+        // Clear firing state to stop replay cycle
+        if (currentlyFiringReminder != null &&
+                currentlyFiringReminder.getId().equals(reminder.getId())) {
+            currentlyFiringReminder = null;
+            replayCount = 0;
+        }
 
         // Refresh UI
         Platform.runLater(() -> {

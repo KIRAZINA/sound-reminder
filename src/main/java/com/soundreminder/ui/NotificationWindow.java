@@ -1,10 +1,5 @@
 package com.soundreminder.ui;
 
-import java.io.File;
-import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.soundreminder.model.Reminder;
 import com.soundreminder.sound.SoundManager;
 import com.soundreminder.storage.StorageService;
@@ -12,7 +7,7 @@ import com.soundreminder.storage.StorageService;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -24,104 +19,89 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-/**
- * Notification pop-up window that appears in the top-left corner of the screen.
- * Displays the reminder message, attached image (if any), and a "Mark as Done" checkbox.
- * Stays on top until acknowledged.
- */
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class NotificationWindow {
 
     private static final Logger LOGGER = Logger.getLogger(NotificationWindow.class.getName());
 
-    /** Width of the notification window in pixels. */
     private static final double WIDTH = 450;
-
-    /** Maximum height of the notification window in pixels. */
     private static final double MAX_HEIGHT = 500;
-
-    /** Maximum width for attached images when displayed. */
     private static final double MAX_IMAGE_WIDTH = 380;
-
-    /** Maximum height for attached images when displayed. */
     private static final double MAX_IMAGE_HEIGHT = 250;
 
-    /** The JavaFX stage for this notification. */
+    private static final long[] SNOOZE_OPTIONS = {300, 900, 1800, 3600}; // 5m, 15m, 30m, 1h
+
     private final Stage stage;
-
-    /** Label displaying the reminder message. */
     private final Label messageLabel;
-
-    /** ImageView for displaying an attached image. */
     private final ImageView imageView;
-
-    /** Checkbox to mark the reminder as done. */
-    private final CheckBox doneCheckBox;
-
-    /** Callback invoked when the user marks the reminder as done. */
+    private final Button doneButton;
+    private final Button stopRecurringButton;
+    private final HBox snoozeBox;
     private final Consumer<Reminder> onDoneCallback;
-
-    /** The reminder associated with this notification. */
+    private final BiConsumer<Reminder, Long> onSnoozeCallback;
     private Reminder reminder;
-
-    /** Sound manager for stopping the alarm when done. */
     private final SoundManager soundManager;
-
-    /** Storage service for persisting the reminder state change. */
     private final StorageService storageService;
 
-    /**
-     * Creates a new NotificationWindow.
-     *
-     * @param soundManager    the sound manager to stop the alarm
-     * @param storageService  the storage service for persistence
-     * @param onDoneCallback  callback invoked when the user marks the reminder as done
-     */
     public NotificationWindow(SoundManager soundManager, StorageService storageService,
-                              Consumer<Reminder> onDoneCallback) {
+                              Consumer<Reminder> onDoneCallback,
+                              BiConsumer<Reminder, Long> onSnoozeCallback) {
         this.soundManager = soundManager;
         this.storageService = storageService;
         this.onDoneCallback = onDoneCallback;
+        this.onSnoozeCallback = onSnoozeCallback;
 
-        // Create undecorated stage
         stage = new Stage();
         stage.initStyle(StageStyle.UNDECORATED);
         stage.setAlwaysOnTop(true);
         stage.setResizable(false);
 
-        // Build the scene
         BorderPane root = new BorderPane();
         root.getStyleClass().add("notification-root");
         root.setPadding(new Insets(16));
 
-        // Message label at the top
         messageLabel = new Label();
         messageLabel.getStyleClass().add("notification-message");
         messageLabel.setWrapText(true);
         messageLabel.setFont(Font.font("Segoe UI", 16));
 
-        // Image view (initially hidden)
         imageView = new ImageView();
         imageView.setPreserveRatio(true);
         imageView.setSmooth(true);
         imageView.setVisible(false);
         imageView.setManaged(false);
 
-        // "Mark as Done" checkbox at the bottom
-        doneCheckBox = new CheckBox("Mark as Done");
-        doneCheckBox.getStyleClass().add("notification-done-checkbox");
-        doneCheckBox.setFont(Font.font("Segoe UI", 14));
+        doneButton = new Button("Mark as Done");
+        doneButton.getStyleClass().add("btn-primary");
+        doneButton.setOnAction(e -> handleDone());
 
-        // Center the checkbox in an HBox for proper alignment
-        HBox checkBoxBox = new HBox(doneCheckBox);
-        checkBoxBox.setAlignment(Pos.CENTER);
-        checkBoxBox.setPadding(new Insets(12, 0, 0, 0));
+        stopRecurringButton = new Button("Stop Recurring");
+        stopRecurringButton.getStyleClass().add("btn-delete");
+        stopRecurringButton.setVisible(false);
+        stopRecurringButton.setManaged(false);
+        stopRecurringButton.setOnAction(e -> handleStopRecurring());
 
-        // Layout: VBox containing message, image, and checkbox
-        VBox contentBox = new VBox(12, messageLabel, imageView, checkBoxBox);
-        contentBox.setAlignment(Pos.CENTER_LEFT);
+        snoozeBox = new HBox(8);
+        snoozeBox.setAlignment(Pos.CENTER);
+        for (long secs : SNOOZE_OPTIONS) {
+            Button btn = new Button(formatSnoozeLabel(secs));
+            btn.getStyleClass().add("btn-secondary");
+            btn.setOnAction(e -> handleSnooze(secs));
+            snoozeBox.getChildren().add(btn);
+        }
+        snoozeBox.setVisible(false);
+        snoozeBox.setManaged(false);
+
+        VBox contentBox = new VBox(12, messageLabel, imageView, snoozeBox, doneButton, stopRecurringButton);
+        contentBox.setAlignment(Pos.CENTER);
         root.setCenter(contentBox);
 
-        // Scene setup
         Scene scene = new Scene(root, WIDTH, 100);
         java.net.URL cssUrl = NotificationWindow.class.getResource("/css/styles.css");
         if (cssUrl != null) {
@@ -129,29 +109,15 @@ public class NotificationWindow {
         }
         stage.setScene(scene);
 
-        // Handle checkbox state change
-        doneCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal && reminder != null) {
-                handleDone();
-            }
-        });
-
         LOGGER.info("NotificationWindow created");
     }
 
-    /**
-     * Shows the notification for the given reminder.
-     *
-     * @param reminder the reminder that triggered this notification
-     */
     public void show(Reminder reminder) {
         this.reminder = reminder;
 
-        // Set message text
         String typePrefix = reminder.getType().name().equals("COUNTDOWN") ? "[Timer] " : "[Reminder] ";
         messageLabel.setText(typePrefix + reminder.getMessage());
 
-        // Load and display attached image if present
         if (reminder.getImagePath() != null && !reminder.getImagePath().isBlank()) {
             loadImage(reminder.getImagePath());
         } else {
@@ -159,16 +125,15 @@ public class NotificationWindow {
             imageView.setManaged(false);
         }
 
-        // Reset checkbox
-        doneCheckBox.setSelected(false);
+        boolean recurring = reminder.isRecurring();
+        doneButton.setText(recurring ? "Acknowledge" : "Mark as Done");
+        stopRecurringButton.setVisible(recurring);
+        stopRecurringButton.setManaged(recurring);
+        snoozeBox.setVisible(true);
+        snoozeBox.setManaged(true);
 
-        // Position in top-left corner
-        positionTopLeft();
-
-        // Show the stage
+        positionNotificationWindow();
         stage.show();
-
-        // Adjust height after showing to fit content
         stage.sizeToScene();
         double contentHeight = contentHeight();
         stage.setHeight(Math.min(contentHeight + 32, MAX_HEIGHT));
@@ -176,9 +141,6 @@ public class NotificationWindow {
         LOGGER.info("Notification shown for: " + reminder.getMessage());
     }
 
-    /**
-     * Hides the notification window without marking the reminder as done.
-     */
     public void hide() {
         if (stage.isShowing()) {
             stage.hide();
@@ -186,57 +148,69 @@ public class NotificationWindow {
         }
     }
 
-    /**
-     * Handles the user checking the "Mark as Done" checkbox.
-     * Stops the sound, updates the reminder state, and closes the notification.
-     */
     private void handleDone() {
-        LOGGER.info("Reminder marked as done: " + (reminder != null ? reminder.getId() : "unknown"));
-
-        // Stop the alarm sound
+        LOGGER.info("Reminder done/acknowledged: " + (reminder != null ? reminder.getId() : "unknown"));
         soundManager.stopAlarm();
-
-        // Update reminder state
         if (reminder != null) {
-            reminder.markAsDone();
-            // Persist the change
+            boolean recurring = reminder.isRecurring();
+            if (!recurring) {
+                reminder.markAsDone();
+            }
             storageService.saveReminders(
                     storageService.loadReminders().stream()
                             .map(r -> r.getId().equals(reminder.getId()) ? reminder : r)
                             .toList()
             );
-            // Notify the caller
             onDoneCallback.accept(reminder);
         }
-
-        // Close the notification
         stage.hide();
     }
 
-    /**
-     * Loads an image from the given path and displays it in the notification.
-     *
-     * @param imagePath the path to the image file
-     */
+    private void handleStopRecurring() {
+        LOGGER.info("Recurring reminder stopped: " + (reminder != null ? reminder.getId() : "unknown"));
+        soundManager.stopAlarm();
+        if (reminder != null) {
+            reminder.markAsDone();
+            storageService.saveReminders(
+                    storageService.loadReminders().stream()
+                            .map(r -> r.getId().equals(reminder.getId()) ? reminder : r)
+                            .toList()
+            );
+            onDoneCallback.accept(reminder);
+        }
+        stage.hide();
+    }
+
+    private void handleSnooze(long seconds) {
+        if (reminder == null) return;
+        LOGGER.info("Snoozing reminder " + reminder.getId() + " for " + seconds + "s");
+        soundManager.stopAlarm();
+        if (onSnoozeCallback != null) {
+            onSnoozeCallback.accept(reminder, seconds);
+        } else {
+            // Fallback: mark as done if no snooze callback
+            handleDone();
+        }
+        stage.hide();
+    }
+
     private void loadImage(String imagePath) {
         try {
-            File file = new File(imagePath);
-            if (!file.exists()) {
+            Path resolved = storageService.resolveImagePath(imagePath);
+            if (resolved == null || !resolved.toFile().exists()) {
                 LOGGER.warning("Image file not found: " + imagePath);
                 imageView.setVisible(false);
                 imageView.setManaged(false);
                 return;
             }
-
-            Image image = new Image(file.toURI().toString(), MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT,
+            Image image = new Image(resolved.toUri().toString(), MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT,
                     true, true, false);
             imageView.setImage(image);
             imageView.setVisible(true);
             imageView.setManaged(true);
             imageView.setFitWidth(image.getWidth());
             imageView.setFitHeight(image.getHeight());
-
-            LOGGER.info("Image loaded in notification: " + imagePath);
+            LOGGER.info("Image loaded in notification: " + resolved);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to load image: " + imagePath, e);
             imageView.setVisible(false);
@@ -244,14 +218,11 @@ public class NotificationWindow {
         }
     }
 
-    /**
-     * Positions the notification window in the top-left corner of the primary screen.
-     */
-    private void positionTopLeft() {
+    private void positionNotificationWindow() {
         Screen primary = Screen.getPrimary();
         if (primary != null) {
             javafx.geometry.Rectangle2D bounds = primary.getVisualBounds();
-            stage.setX(bounds.getMinX() + 10);
+            stage.setX(bounds.getMaxX() - stage.getWidth() - 10);
             stage.setY(bounds.getMinY() + 10);
         } else {
             stage.setX(10);
@@ -259,28 +230,21 @@ public class NotificationWindow {
         }
     }
 
-    /**
-     * Calculates the approximate content height needed for the notification.
-     *
-     * @return the content height in pixels
-     */
     private double contentHeight() {
-        double height = 60; // Message label area
-
+        double height = 60;
         if (imageView.isVisible() && imageView.getImage() != null) {
             height += imageView.getFitHeight() + 12;
         }
-
-        height += 40; // Checkbox area
+        height += 80;
         return Math.min(height, MAX_HEIGHT);
     }
 
-    /**
-     * Checks whether the notification is currently visible.
-     *
-     * @return true if the window is showing
-     */
     public boolean isShowing() {
         return stage.isShowing();
+    }
+
+    private static String formatSnoozeLabel(long seconds) {
+        if (seconds < 3600) return (seconds / 60) + "m";
+        return (seconds / 3600) + "h";
     }
 }

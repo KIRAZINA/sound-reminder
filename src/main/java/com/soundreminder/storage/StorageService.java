@@ -175,21 +175,41 @@ public class StorageService {
     }
 
     /**
-     * Copies an image file to the app's images directory and returns the new path.
+     * Copies an image file to the app's images directory and returns the
+     * relative path (relative to the storage root) for portable storage.
      *
      * @param sourcePath the path to the source image file
-     * @return the path of the copied image within the app's storage
+     * @return the relative path from baseDir to the copied image (e.g. "images/1687654321_photo.png")
      * @throws IOException if the copy operation fails
      */
-    public Path copyImageToStorage(Path sourcePath) throws IOException {
+    public String copyImageToStorage(Path sourcePath) throws IOException {
         String fileName = sourcePath.getFileName().toString();
-        // Prepend timestamp to avoid name collisions
         String timestamp = String.valueOf(System.currentTimeMillis());
         String newName = timestamp + "_" + fileName;
         Path destPath = imagesDir.resolve(newName);
         Files.copy(sourcePath, destPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        LOGGER.info("Copied image to storage: " + destPath);
-        return destPath;
+        String relativePath = baseDir.relativize(destPath).toString().replace("\\", "/");
+        LOGGER.info("Copied image to storage: " + destPath + " (relative: " + relativePath + ")");
+        return relativePath;
+    }
+
+    /**
+     * Resolves a potentially relative image path to an absolute path.
+     * If the path is already absolute, returns it unchanged.
+     * If the path is relative, resolves it against the storage base directory.
+     *
+     * @param imagePath the stored image path (relative or absolute)
+     * @return the absolute path to the image file
+     */
+    public Path resolveImagePath(String imagePath) {
+        if (imagePath == null || imagePath.isBlank()) {
+            return null;
+        }
+        Path path = Path.of(imagePath);
+        if (path.isAbsolute()) {
+            return path;
+        }
+        return baseDir.resolve(path).normalize();
     }
 
     /**

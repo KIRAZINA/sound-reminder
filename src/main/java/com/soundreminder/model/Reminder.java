@@ -1,151 +1,138 @@
 package com.soundreminder.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
-/**
- * Represents a single reminder or countdown timer entry.
- * Implements Comparable for priority queue ordering by trigger time.
- */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Reminder implements Serializable, Comparable<Reminder> {
 
     @Serial
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
-    /** Unique identifier for this reminder. */
     private String id;
-
-    /** The type of this reminder (scheduled or countdown). */
     private ReminderType type;
-
-    /** The date and time when this reminder should fire. */
     private LocalDateTime triggerTime;
-
-    /** Custom message text to display in the notification. */
     private String message;
-
-    /** File path to an attached image, or null if no image is attached. */
     private String imagePath;
-
-    /** Whether this reminder is currently active. */
     private boolean active;
-
-    /** Whether this reminder has been marked as done. */
     private boolean done;
-
-    /** Timestamp when this reminder was originally created. */
     private LocalDateTime createdAt;
+    private RecurrenceRule recurrenceRule;
+    private LocalDateTime lastFiredAt;
+    private int snoozeCount;
+    private LocalDateTime lastSnoozedAt;
+    private Set<String> tags;
+    private Priority priority;
 
-    // No-args constructor for Jackson deserialization
     @SuppressWarnings("unused")
     private Reminder() {
     }
 
-    /**
-     * Creates a new reminder with the specified properties.
-     *
-     * @param type        the reminder type
-     * @param triggerTime the time when this reminder should fire
-     * @param message     the notification message
-     * @param imagePath   path to attached image, or null
-     */
     @JsonCreator
     public Reminder(
             @JsonProperty("type") ReminderType type,
             @JsonProperty("triggerTime") LocalDateTime triggerTime,
             @JsonProperty("message") String message,
-            @JsonProperty("imagePath") String imagePath) {
+            @JsonProperty("imagePath") String imagePath,
+            @JsonProperty("recurrenceRule") RecurrenceRule recurrenceRule,
+            @JsonProperty("priority") Priority priority,
+            @JsonProperty("tags") Set<String> tags) {
         this.id = UUID.randomUUID().toString();
         this.type = type;
         this.triggerTime = triggerTime;
         this.message = message;
         this.imagePath = imagePath;
+        this.recurrenceRule = recurrenceRule;
+        this.priority = priority != null ? priority : Priority.NORMAL;
+        this.tags = tags != null ? tags : new HashSet<>();
         this.active = true;
         this.done = false;
         this.createdAt = LocalDateTime.now();
+        this.snoozeCount = 0;
     }
 
-    /**
-     * Marks this reminder as done and deactivates it.
-     */
+    public Reminder(ReminderType type, LocalDateTime triggerTime, String message, String imagePath) {
+        this(type, triggerTime, message, imagePath, null, Priority.NORMAL, new HashSet<>());
+    }
+
     public void markAsDone() {
         this.done = true;
         this.active = false;
     }
 
-    public String getId() {
-        return id;
+    public void snoozeUntil(LocalDateTime newTime) {
+        this.triggerTime = newTime;
+        this.snoozeCount++;
+        this.lastSnoozedAt = LocalDateTime.now();
+        this.active = true;
+        this.done = false;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public boolean isRecurring() {
+        return recurrenceRule != null;
     }
 
-    public ReminderType getType() {
-        return type;
+    public LocalDateTime computeNextOccurrence() {
+        if (recurrenceRule == null) return null;
+        LocalDateTime from = lastFiredAt != null ? lastFiredAt : triggerTime;
+        return recurrenceRule.computeNextOccurrence(from);
     }
 
-    public void setType(ReminderType type) {
-        this.type = type;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public LocalDateTime getTriggerTime() {
-        return triggerTime;
-    }
+    public ReminderType getType() { return type; }
+    public void setType(ReminderType type) { this.type = type; }
 
-    public void setTriggerTime(LocalDateTime triggerTime) {
-        this.triggerTime = triggerTime;
-    }
+    public LocalDateTime getTriggerTime() { return triggerTime; }
+    public void setTriggerTime(LocalDateTime triggerTime) { this.triggerTime = triggerTime; }
 
-    public String getMessage() {
-        return message;
-    }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
 
-    public void setMessage(String message) {
-        this.message = message;
-    }
+    public String getImagePath() { return imagePath; }
+    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
-    public String getImagePath() {
-        return imagePath;
-    }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 
-    public void setImagePath(String imagePath) {
-        this.imagePath = imagePath;
-    }
+    public boolean isDone() { return done; }
+    public void setDone(boolean done) { this.done = done; }
 
-    public boolean isActive() {
-        return active;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public void setActive(boolean active) {
-        this.active = active;
-    }
+    public RecurrenceRule getRecurrenceRule() { return recurrenceRule; }
+    public void setRecurrenceRule(RecurrenceRule recurrenceRule) { this.recurrenceRule = recurrenceRule; }
 
-    public boolean isDone() {
-        return done;
-    }
+    public LocalDateTime getLastFiredAt() { return lastFiredAt; }
+    public void setLastFiredAt(LocalDateTime lastFiredAt) { this.lastFiredAt = lastFiredAt; }
 
-    public void setDone(boolean done) {
-        this.done = done;
-    }
+    public int getSnoozeCount() { return snoozeCount; }
+    public void setSnoozeCount(int snoozeCount) { this.snoozeCount = snoozeCount; }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    public LocalDateTime getLastSnoozedAt() { return lastSnoozedAt; }
+    public void setLastSnoozedAt(LocalDateTime lastSnoozedAt) { this.lastSnoozedAt = lastSnoozedAt; }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public Set<String> getTags() { return tags; }
+    public void setTags(Set<String> tags) { this.tags = tags; }
+
+    public Priority getPriority() { return priority; }
+    public void setPriority(Priority priority) { this.priority = priority; }
 
     @Override
     public int compareTo(Reminder other) {
-        return this.triggerTime.compareTo(other.triggerTime);
+        int cmp = this.triggerTime.compareTo(other.triggerTime);
+        return cmp != 0 ? cmp : this.id.compareTo(other.id);
     }
 
     @Override
@@ -169,6 +156,8 @@ public class Reminder implements Serializable, Comparable<Reminder> {
                 ", triggerTime=" + triggerTime +
                 ", message='" + message + '\'' +
                 ", active=" + active +
+                ", priority=" + priority +
+                ", recurring=" + (recurrenceRule != null) +
                 '}';
     }
 }

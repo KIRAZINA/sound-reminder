@@ -87,7 +87,7 @@ chmod +x gradlew
 
 ### When a Reminder Fires
 - The alarm sound starts immediately
-- A notification appears in the **top-left corner**
+- A notification appears in the **top-right corner**
 - Check **"Mark as Done"** to stop the sound and remove the reminder
 - If not acknowledged: sound stops after 60s, restarts after 5 minutes
 

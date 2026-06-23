@@ -57,7 +57,7 @@ public class CountdownTimerTab extends Tab {
     private Spinner<Integer> secondsSpinner;
     private TextArea messageArea;
     private Label attachedImageLabel;
-    private Path selectedImagePath;
+    private String selectedImagePath;
     private Button attachImageButton;
     private Button startTimerButton;
     private ListView<TimerDisplay> timersList;
@@ -204,10 +204,9 @@ public class CountdownTimerTab extends Tab {
         File selected = fileChooser.showOpenDialog(timersList.getScene().getWindow());
         if (selected != null && selected.exists()) {
             try {
-                Path copied = storageService.copyImageToStorage(selected.toPath());
-                selectedImagePath = copied;
+                selectedImagePath = storageService.copyImageToStorage(selected.toPath());
                 attachedImageLabel.setText("Attached: " + selected.getName());
-                LOGGER.info("Image attached for timer: " + copied);
+                LOGGER.info("Image attached for timer: " + selectedImagePath);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to attach image", e);
                 showAlert("Error", "Failed to attach image: " + e.getMessage());
@@ -243,7 +242,7 @@ public class CountdownTimerTab extends Tab {
                 ReminderType.COUNTDOWN,
                 triggerTime,
                 message,
-                selectedImagePath != null ? selectedImagePath.toString() : null
+                selectedImagePath
         );
 
         // Add to shared list
@@ -334,9 +333,9 @@ public class CountdownTimerTab extends Tab {
                     // Load thumbnail if image exists
                     if (display.getImagePath() != null && !display.getImagePath().isBlank()) {
                         try {
-                            File imgFile = new File(display.getImagePath());
-                            if (imgFile.exists()) {
-                                Image img = new Image(imgFile.toURI().toString(), 40, 40,
+                            Path resolved = storageService.resolveImagePath(display.getImagePath());
+                            if (resolved != null && resolved.toFile().exists()) {
+                                Image img = new Image(resolved.toUri().toString(), 40, 40,
                                         true, true);
                                 thumbnail.setImage(img);
                                 thumbnail.setVisible(true);

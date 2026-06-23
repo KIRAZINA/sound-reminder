@@ -308,13 +308,13 @@ class IntegrationTest {
         Files.write(img1, new byte[]{1, 2, 3, 4});
         Files.write(img2, new byte[]{1, 2, 3, 4});
 
-        Path copied1 = storageService.copyImageToStorage(img1);
+        String copied1 = storageService.copyImageToStorage(img1);
         Thread.sleep(10); // Ensure different timestamp
-        Path copied2 = storageService.copyImageToStorage(img2);
+        String copied2 = storageService.copyImageToStorage(img2);
 
         // Both should exist and have different paths (timestamp prefix)
-        assertNotEquals(copied1.getFileName(), copied2.getFileName());
-        assertTrue(Files.exists(copied1));
-        assertTrue(Files.exists(copied2));
+        assertNotEquals(copied1, copied2);
+        assertTrue(Files.exists(storageService.resolveImagePath(copied1)));
+        assertTrue(Files.exists(storageService.resolveImagePath(copied2)));
     }
 }

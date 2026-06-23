@@ -47,6 +47,10 @@ public class Main extends Application {
         try {
             LOGGER.info("=== SoundReminder Starting ===");
 
+            // Prevent JavaFX from exiting when the last window is closed
+            // (needed for AWT system tray interop on macOS and Linux)
+            Platform.setImplicitExit(false);
+
             // Initialize storage service
             StorageService storageService = new StorageService();
 

@@ -155,12 +155,12 @@ class StorageServiceTest {
         Path sourceImage = tempDir.resolve("test_image.png");
         Files.write(sourceImage, new byte[]{(byte) 0x89, 'P', 'N', 'G'});
 
-        Path destPath = storageService.copyImageToStorage(sourceImage);
+        String relativePath = storageService.copyImageToStorage(sourceImage);
+        Path destPath = storageService.resolveImagePath(relativePath);
 
         assertTrue(Files.exists(destPath));
-        assertTrue(destPath.startsWith(storageService.getImagesDir()));
-        // File name should have timestamp prefix
-        assertTrue(destPath.getFileName().toString().endsWith("test_image.png"));
+        assertTrue(relativePath.startsWith("images"));
+        assertTrue(relativePath.endsWith("test_image.png"));
     }
 
     @Test

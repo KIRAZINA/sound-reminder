@@ -163,4 +163,17 @@ class ReminderTest {
 
         assertNull(reminder.getImagePath());
     }
+
+    @Test
+    @DisplayName("compareTo breaks ties with id when triggerTime is equal")
+    void testCompareToWithSameTime() {
+        LocalDateTime sameTime = LocalDateTime.now().plusHours(1);
+        Reminder r1 = new Reminder(ReminderType.SCHEDULED, sameTime, "A", null);
+        Reminder r2 = new Reminder(ReminderType.SCHEDULED, sameTime, "B", null);
+
+        // Same triggerTime but different ids: compareTo must not return 0
+        assertNotEquals(0, r1.compareTo(r2));
+        // Consistency: sign must be opposite
+        assertTrue(r1.compareTo(r2) < 0 ^ r2.compareTo(r1) < 0);
+    }
 }

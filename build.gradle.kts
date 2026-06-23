@@ -29,7 +29,6 @@ dependencies {
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.mockito:mockito-core:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -56,7 +55,7 @@ tasks.test {
 
 javafx {
     version = "21.0.3"
-    modules = listOf("javafx.controls", "javafx.fxml", "javafx.media", "javafx.swing")
+    modules = listOf("javafx.controls", "javafx.media", "javafx.swing")
 }
 
 application {
@@ -83,7 +82,7 @@ gluonfx {
 
 // Ensure resources are copied properly
 tasks.processResources {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // JAR task with manifest
