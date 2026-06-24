@@ -18,6 +18,17 @@ java {
     }
 }
 
+val javafxVersion = "21.0.3"
+
+val osClassifier: String by lazy {
+    val os = System.getProperty("os.name").lowercase()
+    when {
+        os.contains("win") -> "win"
+        os.contains("mac") -> "mac"
+        else -> "linux"
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -26,6 +37,13 @@ dependencies {
     // JSON serialization/deserialization
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
+
+    // JavaFX (explicit implementation deps for fat JAR — plugin handles module path for gradlew run)
+    implementation("org.openjfx:javafx-base:$javafxVersion:$osClassifier")
+    implementation("org.openjfx:javafx-graphics:$javafxVersion:$osClassifier")
+    implementation("org.openjfx:javafx-controls:$javafxVersion:$osClassifier")
+    implementation("org.openjfx:javafx-media:$javafxVersion:$osClassifier")
+    implementation("org.openjfx:javafx-swing:$javafxVersion:$osClassifier")
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
@@ -54,7 +72,7 @@ tasks.test {
 }
 
 javafx {
-    version = "21.0.3"
+    version = javafxVersion
     modules = listOf("javafx.controls", "javafx.media", "javafx.swing")
 }
 
@@ -112,5 +130,6 @@ tasks.register<Jar>("fatJar") {
     from({
         configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
     })
+    exclude("module-info.class")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
