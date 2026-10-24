@@ -61,6 +61,7 @@ public class SoundManager {
      */
     public void startAlarm() {
         stopAlarm();
+        alarmActive = true;
 
         try {
             // Load sound data if not already cached
@@ -70,6 +71,7 @@ public class SoundManager {
 
             if (soundData == null) {
                 LOGGER.severe("No sound data available");
+                alarmActive = false;
                 return;
             }
 
@@ -90,10 +92,10 @@ public class SoundManager {
 
             LOGGER.info("Alarm started, volume: " + settings.getVolume());
         } catch (LineUnavailableException | IOException | UnsupportedAudioFileException | IllegalArgumentException e) {
-            alarmActive = false;
             if (e instanceof IllegalArgumentException) {
                 LOGGER.log(Level.WARNING, "Audio line unsupported or headless environment detected, suppressing audio playback.");
             } else {
+                alarmActive = false;
                 LOGGER.log(Level.SEVERE, "Failed to start alarm", e);
             }
         }
