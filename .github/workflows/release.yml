@@ -31,8 +31,11 @@ jobs:
       - name: Build portable installer
         run: python build_installer.py
 
+      - name: Package portable installer
+        run: Compress-Archive -Path build\installer\SoundReminder -DestinationPath build\SoundReminder-Portable.zip -Force
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/installer/**/*
+          files: build/SoundReminder-Portable.zip
           generate_release_notes: true
