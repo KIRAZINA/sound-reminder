@@ -103,8 +103,6 @@ public class MainWindow {
         // Create scheduler with callback for when reminders fire
         this.scheduler = new ReminderScheduler(executorService, this::onReminderFired);
 
-        this.notificationManager = new NotificationManager(soundManager, storageService,
-                this::onReminderDone, this::onSnoozeReminder);
         new GlobalHotkeyManager(() -> { });
 
         // Build the UI
@@ -122,6 +120,9 @@ public class MainWindow {
                 allReminders.stream().filter(Reminder::isActive).toList(),
                 this::cleanup
         );
+        notificationManager = new NotificationManager(soundManager, storageService,
+                this::onReminderDone, this::onSnoozeReminder);
+        notificationManager.setSystemTrayManager(systemTrayManager);
 
         LOGGER.info("Main window initialized");
     }
@@ -278,7 +279,8 @@ public class MainWindow {
             // Start the alarm sound
             soundManager.startAlarm();
 
-            // Show notification (with snooze and recurring support)
+            // Attempt native notification, then show JavaFX notification
+            notificationManager.tryNativeNotification(reminder);
             activeNotification = notificationManager.createNotificationWindow();
             activeNotification.show(reminder);
 
