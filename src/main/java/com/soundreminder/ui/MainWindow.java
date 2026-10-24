@@ -45,6 +45,9 @@ public class MainWindow {
     /** The main application stage. */
     private final Stage stage;
 
+    /** Application settings. */
+    private final AppSettings settings;
+
     /** Storage service for persistence. */
     private final StorageService storageService;
 
@@ -60,7 +63,8 @@ public class MainWindow {
     /** Shared list of all active reminders (thread-safe). */
     private final CopyOnWriteArrayList<Reminder> allReminders;
 
-    /** Currently active notification window. */
+    /** Notification manager abstraction. */
+    private final NotificationManager notificationManager;
     private volatile NotificationWindow activeNotification;
 
     /** Currently firing reminder (for replay logic). */
@@ -85,6 +89,7 @@ public class MainWindow {
     public MainWindow(Stage stage, StorageService storageService, AppSettings settings) {
         this.stage = stage;
         this.storageService = storageService;
+        this.settings = settings;
         this.soundManager = new SoundManager(settings);
         this.allReminders = new CopyOnWriteArrayList<>();
 
@@ -97,6 +102,10 @@ public class MainWindow {
 
         // Create scheduler with callback for when reminders fire
         this.scheduler = new ReminderScheduler(executorService, this::onReminderFired);
+
+        this.notificationManager = new NotificationManager(soundManager, storageService,
+                this::onReminderDone, this::onSnoozeReminder);
+        new GlobalHotkeyManager(() -> { });
 
         // Build the UI
         buildMainWindow();
@@ -160,7 +169,7 @@ public class MainWindow {
 
         // Create scene
         Scene scene = new Scene(root, 700, 600);
-        loadStylesheet(scene, "/css/styles.css");
+        applyTheme(scene);
         stage.setScene(scene);
 
         // Handle window close event
@@ -270,8 +279,7 @@ public class MainWindow {
             soundManager.startAlarm();
 
             // Show notification (with snooze and recurring support)
-            activeNotification = new NotificationWindow(soundManager, storageService,
-                    this::onReminderDone, this::onSnoozeReminder);
+            activeNotification = notificationManager.createNotificationWindow();
             activeNotification.show(reminder);
 
             // Show system tray notification
@@ -319,9 +327,7 @@ public class MainWindow {
 
                             // Re-show notification
                             if (activeNotification == null || !activeNotification.isShowing()) {
-                                activeNotification = new NotificationWindow(
-                                        soundManager, storageService,
-                                        this::onReminderDone, this::onSnoozeReminder);
+                                activeNotification = notificationManager.createNotificationWindow();
                                 activeNotification.show(reminder);
                             }
 
@@ -433,9 +439,16 @@ public class MainWindow {
         LOGGER.info("Reminder deleted: " + reminderId);
     }
 
-    /**
-     * Cleans up all resources when the application is closing.
-     */
+    public void applyTheme(javafx.scene.Scene scene) {
+        if (scene == null) return;
+        scene.getStylesheets().removeIf(s -> s.contains("/css/") && s.endsWith(".css"));
+        String css = (settings != null && settings.getTheme() == AppSettings.Theme.LIGHT)
+                ? "/css/light.css" : "/css/dark.css";
+        java.net.URL url = MainWindow.class.getResource(css);
+        if (url != null) {
+            scene.getStylesheets().add(url.toExternalForm());
+        }
+    }
     public void cleanup() {
         LOGGER.info("Cleaning up resources...");
 

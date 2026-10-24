@@ -11,6 +11,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Slider;
@@ -41,6 +42,9 @@ public class SettingsDialog {
 
     /** Slider for volume control. */
     private Slider volumeSlider;
+
+    /** Combo for theme selection. */
+    private ComboBox<AppSettings.Theme> themeCombo;
 
     /** Label showing the current custom sound path. */
     private Label soundPathLabel;
@@ -106,9 +110,6 @@ public class SettingsDialog {
 
         // Test sound button
         Button testSoundButton = new Button("Test Sound");
-        testSoundButton.getStyleClass().add("btn-secondary");
-        testSoundButton.setOnAction(e -> soundManager.testSound());
-
         // Volume control
         VBox volumeSection = new VBox(8);
 
@@ -138,6 +139,16 @@ public class SettingsDialog {
         volumeRow.getChildren().addAll(volumeLabel, volumeSlider, volumeValueLabel);
         volumeSection.getChildren().addAll(volumeRow, testSoundButton);
 
+        // Theme selection
+        HBox themeRow = new HBox(10);
+        themeRow.setAlignment(Pos.CENTER_LEFT);
+        Label themeLabel = new Label("Theme:");
+        themeLabel.getStyleClass().add("field-label");
+        themeCombo = new ComboBox<>();
+        themeCombo.getItems().addAll(AppSettings.Theme.values());
+        themeCombo.setValue(settings.getTheme());
+        themeRow.getChildren().addAll(themeLabel, themeCombo);
+
         // --- Buttons ---
         HBox buttonRow = new HBox(12);
         buttonRow.setAlignment(Pos.CENTER_RIGHT);
@@ -153,7 +164,7 @@ public class SettingsDialog {
         buttonRow.getChildren().addAll(saveButton, cancelButton);
 
         root.getChildren().addAll(soundTitle, soundRow, new Separator(), volumeSection,
-                new Separator(), buttonRow);
+                new Separator(), themeRow, new Separator(), buttonRow);
 
         Scene scene = new Scene(root);
         java.net.URL cssUrl = SettingsDialog.class.getResource("/css/styles.css");
@@ -193,12 +204,23 @@ public class SettingsDialog {
         }
 
         settings.setVolume(volumeSlider.getValue() / 100.0);
+        settings.setTheme(themeCombo.getValue());
 
         // Persist
         storageService.saveSettings(settings);
 
         // Update sound manager
         soundManager.updateSettings(settings);
+
+        // Apply theme to owner window if possible
+        if (dialogStage.getOwner() instanceof javafx.stage.Stage ownerStage && ownerStage.getScene() != null) {
+            ownerStage.getScene().getStylesheets().removeIf(s -> s.contains("/css/") && s.endsWith(".css"));
+            String css = settings.getTheme() == AppSettings.Theme.LIGHT ? "/css/light.css" : "/css/dark.css";
+            java.net.URL url = SettingsDialog.class.getResource(css);
+            if (url != null) {
+                ownerStage.getScene().getStylesheets().add(url.toExternalForm());
+            }
+        }
 
         LOGGER.info("Settings saved: " + settings);
         dialogStage.close();

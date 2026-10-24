@@ -8,6 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class AppSettings {
 
+    public enum Theme { DARK, LIGHT }
+
     /** Path to the custom sound file, or null to use the default sound. */
     private String customSoundPath;
 
@@ -20,6 +22,9 @@ public class AppSettings {
     /** Optional master password used to derive the storage encryption key. */
     private String encryptionPassword;
 
+    /** UI theme preference. */
+    private Theme theme;
+
     /**
      * Creates settings with default values.
      */
@@ -28,6 +33,7 @@ public class AppSettings {
         this.volume = 0.8;
         this.encryptionEnabled = false;
         this.encryptionPassword = null;
+        this.theme = Theme.DARK;
     }
 
     @JsonCreator
@@ -68,6 +74,14 @@ public class AppSettings {
 
     public void setEncryptionPassword(String encryptionPassword) {
         this.encryptionPassword = encryptionPassword;
+    }
+
+    public Theme getTheme() {
+        return theme != null ? theme : Theme.DARK;
+    }
+
+    public void setTheme(Theme theme) {
+        this.theme = theme != null ? theme : Theme.DARK;
     }
 
     @Override
