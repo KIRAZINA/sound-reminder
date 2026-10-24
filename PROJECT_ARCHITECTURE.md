@@ -6,30 +6,31 @@
 
 ### 1.1 Project Purpose
 
-SoundReminder is a single-process desktop alarm/reminder application built with Java 21 and JavaFX 21. It lets a user create scheduled reminders (specific date/time) and countdown timers (duration from now), attach optional images, play an alarm sound, show a top-right notification, and replay the alarm until acknowledged. Data persists as JSON under `~/.soundreminder/`.
+SoundReminder is a single-process desktop alarm/reminder application built with Java 21 and JavaFX 21. It lets a user create scheduled reminders (specific date/time) and countdown timers (duration from now), attach optional images, play an alarm sound, show a top-right notification, and replay the alarm until acknowledged. Data persists as JSON under `~/.soundreminder/`, with optional AES-256-GCM encryption and zip backup import/export. A CI/CD pipeline and portable installer are included.
 
-**Evidence:** `src/main/java/com/soundreminder/Main.java` (`main`, `start`); `src/main/java/com/soundreminder/ui/MainWindow.java`; `README.md`.
+**Evidence:** `src/main/java/com/soundreminder/Main.java`; `src/main/java/com/soundreminder/ui/MainWindow.java`; `README.md`; `.github/workflows/*`; `build_installer.py`.
 
 ### 1.2 Target Actors
 
 | Actor | Interaction | Implementation |
 |---|---|---|
-| End user | Creates/removes reminders, settings | JavaFX UI in `ui/*Tab.java`, `SettingsDialog.java` |
+| End user | Creates/removes reminders, settings, themes, backups | JavaFX UI in `ui/*Tab.java`, `SettingsDialog.java` |
 | JavaFX runtime | Window lifecycle, rendering | `Main extends Application`, `Platform.setImplicitExit(false)` |
-| File system | JSON persistence, images, logs | `storage/StorageService.java`, `Main.initLogging()` |
+| File system | JSON persistence, images, logs, backups | `storage/StorageService.java`, `Main.initLogging()` |
 | Audio subsystem | Alarm playback | `sound/SoundManager.java` (Java Sound API) |
-| OS system tray | Tray icon/menu | `ui/SystemTrayManager.java` (AWT `SystemTray`) |
+| OS system tray | Tray icon/menu/balloons | `ui/SystemTrayManager.java` (AWT `SystemTray`) |
 | Scheduler thread pool | Timed firing | `scheduler/ReminderScheduler.java`, `MainWindow` executor |
+| CI runner | Build/test/package | `.github/workflows/ci.yml`, `release.yml` |
 
 ### 1.3 System Boundaries
 
-**Inside repository:** Java application module `com.soundreminder`, Gradle build, Python installer script, CSS/icon/sound resources, unit/integration tests.
+**Inside repository:** Java application module `com.soundreminder`, Gradle build, Python installer script, CSS/icon/sound resources, unit/integration tests, GitHub Actions workflows.
 
-**Outside repository:** JDK 21 runtime, JavaFX SDK modules, OS audio/tray APIs, user home directory storage (`~/.soundreminder/`), optional custom sound files, attached image files copied into storage.
+**Outside repository:** JDK 21 runtime, JavaFX SDK modules, OS audio/tray APIs, user home directory storage (`~/.soundreminder/`), optional custom sound files, attached image files copied into storage, GitHub-hosted runners.
 
 ### 1.4 Architectural Paradigm
 
-Desktop monolith (single JVM process) with a hand-wired layered structure: `model` → `storage`/`sound`/`scheduler` → `ui`. It is not a web app, service, or distributed system. Evidence: `application.mainClass = "com.soundreminder.Main"` in `build.gradle.kts`; no HTTP/server dependencies.
+Desktop monolith (single JVM process) with hand-wired layered structure: `model` → `storage`/`sound`/`scheduler`/`util` → `ui`. It is not a web app, service, or distributed system. Evidence: `application.mainClass = "com.soundreminder.Main"` in `build.gradle.kts`; no HTTP/server dependencies.
 
 ---
 
@@ -43,7 +44,6 @@ Desktop monolith (single JVM process) with a hand-wired layered structure: `mode
 | `settings.gradle.kts` | file | root project name | shown |
 | `gradle.properties` | file | Gradle properties | present |
 | `gradlew`, `gradlew.bat` | files | Gradle wrapper | present |
-| `module-info.java` (under src) | file | JPMS module declaration | shown |
 | `src/main/java` | dir | application source | listed |
 | `src/main/resources` | dir | CSS, icons, sounds | listed |
 | `src/test/java` | dir | JUnit tests | listed |
@@ -51,7 +51,9 @@ Desktop monolith (single JVM process) with a hand-wired layered structure: `mode
 | `generate_alarm_sound.py` | file | generates alarm WAV | present |
 | `generate_tray_icon.py` | file | generates tray PNG | present |
 | `README.md` | file | documentation | shown |
-| `.gitignore`, `.gitattributes` | files | git config | present |
+| `.github/workflows/ci.yml` | file | CI build/test | present |
+| `.github/workflows/release.yml` | file | release packaging | present |
+| `PROJECT_ARCHITECTURE.md` | file | architecture analysis | present |
 
 ### 2.2 Source Tree
 
@@ -59,11 +61,11 @@ Desktop monolith (single JVM process) with a hand-wired layered structure: `mode
 |---|---|---|---|
 | `com.soundreminder` | entry point, logging | model, storage, ui | JVM |
 | `com.soundreminder.model` | domain objects | Jackson | all |
-| `com.soundreminder.storage` | JSON persistence | model, Jackson, NIO | ui, Main |
+| `com.soundreminder.storage` | JSON persistence, backup, encryption | model, Jackson, NIO, CryptoUtils | Main, ui |
 | `com.soundreminder.sound` | audio playback | model, Java Sound | ui |
 | `com.soundreminder.scheduler` | timed firing | model, executors | ui |
-| `com.soundreminder.ui` | JavaFX UI | model, storage, sound, scheduler | Main |
-| `com.soundreminder.util` | NLP parser, sound generator | model | sound (generator only) |
+| `com.soundreminder.ui` | JavaFX UI, themes, notifications | model, storage, sound, scheduler | Main |
+| `com.soundreminder.util` | NLP parser, sound generator, crypto | model | sound, storage, ui |
 
 ### 2.3 Dependency Management
 
@@ -85,26 +87,29 @@ Tests run with `--add-opens`/`--add-exports` for reflection. Fat JAR task `fatJa
 Manual constructor-based composition (no DI framework). UI components receive collaborators via constructors. Observed layers:
 
 - `model`: passive data/serialization
-- `storage`: persistence
+- `storage`: persistence, encryption, backup
 - `sound`: audio
 - `scheduler`: timing
 - `ui`: presentation + orchestration (MainWindow owns lifecycle)
-- `util`: helpers
+- `util`: helpers (NLP, crypto, sound generation)
 
 ### 3.2 Component Map
 
 | Component | Location | Responsibility | Depends On | Used By |
 |---|---|---|---|---|
 | Main | `com.soundreminder.Main` | logging, startup | StorageService, MainWindow | JVM |
-| StorageService | `storage/StorageService.java` | JSON persistence | model, Jackson | Main, ui |
+| StorageService | `storage/StorageService.java` | JSON persistence, encryption, backup | model, Jackson, CryptoUtils | Main, ui |
+| CryptoUtils | `util/CryptoUtils.java` | AES-256-GCM, PBKDF2 | javax.crypto | StorageService |
 | SoundManager | `sound/SoundManager.java` | alarm playback | AppSettings, Java Sound | ui |
 | ReminderScheduler | `scheduler/ReminderScheduler.java` | timed firing | model, executors | MainWindow |
-| MainWindow | `ui/MainWindow.java` | orchestration, replay | all | Main |
-| ScheduledReminderTab | `ui/ScheduledReminderTab.java` | scheduled reminder CRUD | storage, sound, scheduler | MainWindow |
-| CountdownTimerTab | `ui/CountdownTimerTab.java` | countdown CRUD | storage, sound, scheduler | MainWindow |
+| MainWindow | `ui/MainWindow.java` | orchestration, replay, themes | all | Main |
+| ScheduledReminderTab | `ui/ScheduledReminderTab.java` | scheduled reminder CRUD, NLP quick-add, priority/recurrence | storage, sound, scheduler | MainWindow |
+| CountdownTimerTab | `ui/CountdownTimerTab.java` | countdown CRUD, priority/recurrence | storage, sound, scheduler | MainWindow |
 | NotificationWindow | `ui/NotificationWindow.java` | alarm popup | sound, storage | MainWindow |
+| NotificationManager | `ui/NotificationManager.java` | notification abstraction | sound, storage | MainWindow |
 | SystemTrayManager | `ui/SystemTrayManager.java` | tray icon | model, AWT | MainWindow |
-| NaturalLanguageParser | `util/NaturalLanguageParser.java` | NLP parsing | model | (not wired in main UI) |
+| GlobalHotkeyManager | `ui/GlobalHotkeyManager.java` | hotkey scaffold | logging | MainWindow |
+| NaturalLanguageParser | `util/NaturalLanguageParser.java` | NLP parsing | model | ScheduledReminderTab |
 
 ### 3.3 Dependency Direction
 
@@ -117,12 +122,14 @@ graph TD
     MainWindow --> ReminderScheduler
     MainWindow --> ScheduledReminderTab
     MainWindow --> CountdownTimerTab
+    MainWindow --> NotificationManager
     MainWindow --> SystemTrayManager
     ScheduledReminderTab --> StorageService
     ScheduledReminderTab --> SoundManager
     CountdownTimerTab --> StorageService
     SoundManager --> AppSettings
     ReminderScheduler --> Reminder
+    StorageService --> CryptoUtils
 ```
 
 ### 3.4 Architecture Implementation Evidence
@@ -134,6 +141,8 @@ this.soundManager = new SoundManager(settings);
 this.allReminders = new CopyOnWriteArrayList<>();
 this.executorService = Executors.newScheduledThreadPool(4, r -> { ... });
 this.scheduler = new ReminderScheduler(executorService, this::onReminderFired);
+this.notificationManager = new NotificationManager(soundManager, storageService,
+        this::onReminderDone, this::onSnoozeReminder);
 ```
 
 File: `src/main/java/com/soundreminder/ui/MainWindow.java` (constructor).
@@ -146,19 +155,19 @@ File: `src/main/java/com/soundreminder/ui/MainWindow.java` (constructor).
 
 - `Reminder` (entity, Serializable, Comparable): id, type, triggerTime, message, imagePath, active, done, recurrence, priority, tags, snooze fields.
 - `ReminderType`: SCHEDULED, COUNTDOWN.
-- `AppSettings`: customSoundPath, volume (clamped 0–1).
+- `AppSettings`: customSoundPath, volume (clamped 0–1), encryptionEnabled, encryptionPassword, theme (DARK/LIGHT).
 - `Priority`: LOW/NORMAL/HIGH/URGENT with rank; JSON via `@JsonValue`/`@JsonCreator`.
 - `RecurrenceRule`: frequency, interval, daysOfWeek, dayOfMonth, description; computes next occurrence.
 - `Tag`: name + colorHex (validated regex).
 - `ParsedInput`: NLP parser output.
+- `Theme`: DARK/LIGHT enum in AppSettings.
 
 ### 4.2 Entities
 
 | Entity | File | Identity | Key Fields |
 |---|---|---|---|
 | Reminder | `model/Reminder.java` | UUID `id` | type, triggerTime, message, imagePath, active, done, recurrenceRule, priority, tags, snoozeCount |
-| AppSettings | `model/AppSettings.java` | none (singleton-ish file) | customSoundPath, volume |
-| RecurrenceRule | `model/RecurrenceRule.java` | none | frequency, interval, daysOfWeek, dayOfMonth |
+| AppSettings | `model/AppSettings.java` | none (singleton-ish file) | customSoundPath, volume, encryptionEnabled, encryptionPassword, theme |
 
 ### 4.3 Business Rules
 
@@ -200,6 +209,8 @@ File: `src/main/java/com/soundreminder/model/Reminder.java`.
 
 **UI validation (countdown):** totalSeconds > 0 and message non-empty. File: `CountdownTimerTab.handleStartTimer()`.
 
+**NLP integration:** `ScheduledReminderTab.handleQuickAdd()` uses `NaturalLanguageParser.parse()` to populate date/time, message, priority, recurrence. File: `src/main/java/com/soundreminder/ui/ScheduledReminderTab.java`.
+
 ### 4.4 State Transitions
 
 ```mermaid
@@ -221,19 +232,21 @@ Evidence: `Reminder.markAsDone`, `Reminder.snoozeUntil`, `NotificationWindow.han
 
 **Alarm sound generation (`AlarmSoundGenerator.generateAlarmWav`):** two-tone 880/660 Hz sine wave with exponential envelope, written as 44.1kHz 16-bit mono WAV. File: `src/main/java/com/soundreminder/util/AlarmSoundGenerator.java`.
 
+**AES-256-GCM (`CryptoUtils`):** 12-byte IV, 16-byte salt, PBKDF2WithHmacSHA256, 65536 iterations. File: `src/main/java/com/soundreminder/util/CryptoUtils.java`.
+
 ---
 
 ## 5. Persistence & Storage
 
 ### 5.1 Storage Technology
 
-Jackson `ObjectMapper` with `JavaTimeModule`; file-based JSON; `ReentrantReadWriteLock`; atomic write via temp file + `Files.move(REPLACE_EXISTING)`.
+Jackson `ObjectMapper` with `JavaTimeModule`; file-based JSON; `ReentrantReadWriteLock`; atomic write via temp file + `Files.move(REPLACE_EXISTING)`; optional AES-256-GCM encryption; zip backup import/export.
 
 ### 5.2 Schema (JSON files)
 
 | File | Content | Evidence |
 |---|---|---|
-| `~/.soundreminder/reminders.json` | `List<Reminder>` | `StorageService.remindersFile` |
+| `~/.soundreminder/reminders.json` | `List<Reminder>` or encrypted base64 | `StorageService.remindersFile` |
 | `~/.soundreminder/settings.json` | `AppSettings` | `StorageService.settingsFile` |
 | `~/.soundreminder/images/` | copied image files | `imagesDir` |
 | `~/.soundreminder/logs/` | dated log files | `Main.initLogging()` |
@@ -247,11 +260,11 @@ public List<Reminder> loadReminders() {
     lock.readLock().lock();
     try {
         if (!Files.exists(remindersFile)) { return new ArrayList<>(); }
-        String json = Files.readString(remindersFile);
-        List<Reminder> reminders = objectMapper.readValue(json,
-                objectMapper.getTypeFactory().constructCollectionType(List.class, Reminder.class));
+        // encrypted path if enabled
+        ...
+        List<Reminder> reminders = objectMapper.readValue(json, ...);
         return reminders;
-    } catch (IOException e) {
+    } catch (Exception e) {
         LOGGER.log(Level.SEVERE, "Failed to load reminders", e);
         return new ArrayList<>();
     } finally { lock.readLock().unlock(); }
@@ -262,12 +275,13 @@ public List<Reminder> loadReminders() {
 public void saveReminders(List<Reminder> reminders) {
     lock.writeLock().lock();
     try {
-        String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(reminders);
+        // encrypt if enabled
+        ...
         Path tempFile = remindersFile.resolveSibling("reminders.json.tmp");
-        Files.writeString(tempFile, json);
-        Files.move(tempFile, remindersFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    } catch (IOException e) { ... }
-    finally { lock.writeLock().unlock(); }
+        Files.writeString(tempFile, content);
+        Files.move(tempFile, remindersFile, ...REPLACE_EXISTING);
+    } catch (Exception e) { ... }
+    finally { ... }
 }
 ```
 File: `src/main/java/com/soundreminder/storage/StorageService.java`.
@@ -276,12 +290,33 @@ Image copy resolves relative path:
 
 ```java
 public String copyImageToStorage(Path sourcePath) throws IOException {
-    String newName = timestamp + "_" + fileName;
-    Path destPath = imagesDir.resolve(newName);
-    Files.copy(sourcePath, destPath, ...REPLACE_EXISTING);
-    String relativePath = baseDir.relativize(destPath).toString().replace("\\", "/");
-    return relativePath;
+    Path sourceFileName = sourcePath.getFileName();
+    if (sourceFileName == null) throw new IllegalArgumentException(...);
+    String fileName = sourceFileName.toString();
+    ...
 }
+```
+
+Path safety:
+
+```java
+public Path resolveImagePath(String imagePath) {
+    if (imagePath == null || imagePath.isBlank()) return null;
+    if (imagePath.contains("\\") || imagePath.matches("^[a-zA-Z]:.*")) return null;
+    Path path = Path.of(imagePath).normalize();
+    if (path.isAbsolute()) return null;
+    if (path.toString().contains("..")) return null;
+    Path resolved = baseDir.resolve(path).normalize();
+    if (!resolved.startsWith(baseDir)) return null;
+    return resolved;
+}
+```
+
+Backup:
+
+```java
+public void exportBackup(Path destinationZip) throws IOException { ... }
+public void importBackup(Path sourceZip) throws IOException { ... }
 ```
 
 ### 5.4 Transactions
@@ -311,6 +346,7 @@ UI event handlers act as entry points:
 - `ScheduledReminderTab.handleAddReminder()` → validates → creates `Reminder` → `allReminders.add` → `storageService.saveReminders` → `scheduleCallback.accept`.
 - `CountdownTimerTab.handleStartTimer()` similar.
 - `NotificationWindow.handleDone/handleSnooze/handleStopRecurring`.
+- `SettingsDialog.handleSave()` persists settings and applies theme.
 
 ### 6.3 Middleware / Filters / Interceptors
 
@@ -344,9 +380,9 @@ File: `src/main/java/com/soundreminder/scheduler/ReminderScheduler.java`, `recal
 ### 6.6 Error Handling
 
 - `Main.start` catches `IOException` and generic `Exception`, shows JavaFX `Alert`, exits.
-- `StorageService` catches `IOException`, logs, returns defaults/empty.
+- `StorageService` catches `IOException`/`Exception`, logs, returns defaults/empty.
 - UI handlers catch exceptions and show `Alert`.
-- `SoundManager` catches audio exceptions and logs.
+- `SoundManager` catches audio exceptions and logs; `IllegalArgumentException` logged as WARNING for headless environments.
 
 Logging: `java.util.logging` to console (WARNING+) and dated file (ALL). File: `Main.initLogging()`.
 
@@ -356,12 +392,13 @@ Logging: `java.util.logging` to console (WARNING+) and dated file (ALL). File: `
 
 ### 7.1 Component Architecture
 
-JavaFX, pure Java (no FXML). `MainWindow` builds `BorderPane` with toolbar + `TabPane`. Two tabs: `ScheduledReminderTab`, `CountdownTimerTab`. CSS from `/css/styles.css`.
+JavaFX, pure Java (no FXML). `MainWindow` builds `BorderPane` with toolbar + `TabPane`. Two tabs: `ScheduledReminderTab`, `CountdownTimerTab`. CSS from `/css/dark.css` or `/css/light.css` based on `AppSettings.Theme`.
 
 ### 7.2 State Management
 
 - Shared `CopyOnWriteArrayList<Reminder> allReminders` passed to tabs.
 - `SoundManager` holds settings reference.
+- `volatile` fields in `MainWindow` for cross-thread visibility (`activeNotification`, `currentlyFiringReminder`, `replayCount`).
 - No global store framework.
 
 ### 7.3 Routing
@@ -374,7 +411,7 @@ No network. Data loaded from `StorageService` at startup (`loadSavedReminders`).
 
 ### 7.5 Styling
 
-CSS resource `/css/styles.css` applied to scenes. Evidence: `loadStylesheet` in MainWindow, SettingsDialog, NotificationWindow.
+CSS resources `/css/styles.css`, `/css/dark.css`, `/css/light.css` applied to scenes. Theme switching at runtime via `MainWindow.applyTheme()` and `SettingsDialog`. Evidence: `applyTheme` method.
 
 ### 7.6 Performance
 
@@ -392,6 +429,7 @@ Only observable optimization: daemon thread pools, `CopyOnWriteArrayList`, atomi
 | Callback/observer | `Consumer<Reminder>`, `BiConsumer` | scheduler, MainWindow | firing events |
 | Strategy (sound fallback) | custom → bundled → generated | `SoundManager.loadSoundData` | audio source selection |
 | Thread-safe collection | `CopyOnWriteArrayList` | `MainWindow` | shared reminder list |
+| Abstraction (notifications) | `NotificationManager` | `ui/NotificationManager.java` | notification creation |
 
 ### 8.2 Dependency Injection
 
@@ -402,6 +440,8 @@ No framework. `MainWindow` constructs `SoundManager`, executor, scheduler; tabs 
 - `AppSettings` persisted JSON.
 - Volume clamped in setter.
 - Custom sound path string; if `"Default (bundled)"` UI maps to null.
+- Theme enum (DARK/LIGHT) persisted.
+- Encryption enabled/password persisted.
 - No environment variables except `user.home`, `os.name`, `app.data.dir` (Android branch).
 - Feature flags: none.
 
@@ -409,7 +449,9 @@ No framework. `MainWindow` constructs `SoundManager`, executor, scheduler; tabs 
 
 - No authentication/authorization.
 - Input validation for dates/times/messages.
-- File copy uses provided path; no path traversal normalization beyond `resolveImagePath` `.normalize()`.
+- Path traversal protection in `resolveImagePath`.
+- AES-256-GCM optional encryption via `CryptoUtils`.
+- Atomic file writes.
 - No SQL (no DB).
 - No CSRF/CORS (no web).
 
@@ -425,10 +467,13 @@ JUnit 5. Test files:
 |---|---|
 | `IntegrationTest` | end-to-end workflow without UI |
 | `SchedulerTest` | scheduling, overdue, cancel, clear |
-| `SoundManagerTest` | playback, fallback, volume, custom sound |
-| `StorageServiceTest` | persistence, images, settings |
+| `SoundManagerTest` | playback, fallback, volume, custom sound, headless |
+| `StorageServiceTest` | persistence, images, settings, backup, path safety |
 | `AppSettingsTest`, `ReminderTest`, `ReminderTypeTest` | model |
 | `AlarmSoundGeneratorTest` | sound generation |
+| `NaturalLanguageParserTest` | NLP parsing |
+| `RecurrenceRuleTest` | recurrence calculations |
+| `CryptoUtilsTest` | encryption round-trip |
 
 Representative test fragment (overdue fires immediately):
 
@@ -452,7 +497,7 @@ File: `src/test/java/com/soundreminder/scheduler/SchedulerTest.java`.
 **Steps:**
 
 1. `ScheduledReminderTab.handleAddReminder()` validates input.
-2. Creates `Reminder(ReminderType.SCHEDULED, triggerTime, message, imagePath)`.
+2. Creates `Reminder(ReminderType.SCHEDULED, triggerTime, message, imagePath, recurrence, priority, tags)`.
 3. `allReminders.add(reminder)`; `storageService.saveReminders(allReminders)`.
 4. `scheduleCallback.accept(reminder)` → `MainWindow.scheduler.schedule(reminder)`.
 5. `ReminderScheduler.schedule` adds to `PriorityBlockingQueue`, calls `recalculateScheduling`.
@@ -471,8 +516,7 @@ private void onReminderFired(Reminder reminder) {
         this.currentlyFiringReminder = reminder;
         this.replayCount = 0;
         soundManager.startAlarm();
-        activeNotification = new NotificationWindow(soundManager, storageService,
-                this::onReminderDone, this::onSnoozeReminder);
+        activeNotification = notificationManager.createNotificationWindow();
         activeNotification.show(reminder);
         scheduleReplay(reminder);
     });
@@ -503,7 +547,7 @@ sequenceDiagram
     MW->>S: saveReminders
 ```
 
-**Edge cases:** past time rejected in UI; overdue reminders on startup are staggered 1 second apart (`loadSavedReminders`); inactive reminders ignored by scheduler.
+**Edge cases:** past time rejected in UI; overdue reminders on startup are staggered 1 second apart (`loadSavedReminders`); inactive reminders ignored by scheduler; headless audio suppressed.
 
 ### 9.2 Flow: Countdown Timer
 
@@ -514,7 +558,7 @@ sequenceDiagram
 
 ### 9.3 Flow: Replay Cycle
 
-`MainWindow.scheduleReplay` schedules: after 60s stop sound if notification not showing (see quirk); after 5 minutes (300s) restart alarm + notification; repeats. Evidence: `REPLAY_DELAY_SECONDS = 60`, `REPLAY_INTERVAL_SECONDS = 300`.
+`MainWindow.scheduleReplay` schedules: after 60s stop sound if notification not showing? Updated to unconditionally stop after 60s and restart after 5 minutes (300s); repeats. Evidence: `REPLAY_DELAY_SECONDS = 60`, `REPLAY_INTERVAL_SECONDS = 300`.
 
 ---
 
@@ -530,7 +574,10 @@ Not present.
 
 ### 10.3 CI/CD
 
-No CI workflow files found in repository (no `.github` directory in listing). Evidence unavailable.
+GitHub Actions workflows:
+
+- `.github/workflows/ci.yml`: triggers on push/PR to main/master; matrix ubuntu/windows; JDK 21 Temurin; Gradle cache; `./gradlew test`, `./gradlew build fatJar`; upload test reports on failure.
+- `.github/workflows/release.yml`: triggers on `v*` tags; runs `build_installer.py`; uploads `build/installer/` to release.
 
 ### 10.4 Kubernetes
 
@@ -538,7 +585,7 @@ Not present.
 
 ### 10.5 Infrastructure as Code / Installer
 
-`build_installer.py` uses Gradle `fatJar` then `jpackage` to create a portable app image under `build/installer/SoundReminder/`. It searches for `jpackage.exe` via `JAVA_HOME`/common paths. Evidence: script shown.
+`build_installer.py` uses Gradle `fatJar` then `jpackage` to create a portable app image under `build/installer/SoundReminder/`. It searches for `jpackage` via `JAVA_HOME`/`shutil.which`. Evidence: script.
 
 ---
 
@@ -547,37 +594,45 @@ Not present.
 ### Scheduling Mechanism
 - **Purpose:** precise timed firing of earliest reminder.
 - **Location:** `src/main/java/com/soundreminder/scheduler/ReminderScheduler.java`
-- **Symbols:** `schedule`, `cancel`, `reSchedule`, `clear`, `checkOverdueReminders`, `recalculateScheduling`, `rescheduleIfRecurring`
+- **Symbols:** `schedule`, `cancel`, `reSchedule`, `clear`, `checkOverdueReminders` (deprecated), `recalculateScheduling`, `rescheduleIfRecurring`
 - **Dependencies:** `ScheduledExecutorService`, `PriorityBlockingQueue`, `Reminder`
 - **Consumers:** `MainWindow`
-- **Source:** see section 6.5 fragment.
 
 ### Persistence Mechanism
-- **Purpose:** atomic JSON save/load.
+- **Purpose:** atomic JSON save/load, optional encryption, backup.
 - **Location:** `src/main/java/com/soundreminder/storage/StorageService.java`
-- **Symbols:** `loadReminders`, `saveReminders`, `loadSettings`, `saveSettings`, `copyImageToStorage`, `resolveImagePath`
+- **Symbols:** `loadReminders`, `saveReminders`, `loadSettings`, `saveSettings`, `copyImageToStorage`, `resolveImagePath`, `exportBackup`, `importBackup`
 - **Source:** section 5.3.
 
 ### Sound Playback
-- **Purpose:** looped alarm with volume.
+- **Purpose:** looped alarm with volume and headless fallback.
 - **Location:** `src/main/java/com/soundreminder/sound/SoundManager.java`
-- **Symbols:** `startAlarm`, `stopAlarm`, `isPlaying`, `loadSoundData`, `setClipVolume`, `testSound`
+- **Symbols:** `startAlarm`, `stopAlarm`, `isPlaying`, `isAudioSupported`, `loadSoundData`, `setClipVolume`, `testSound`
 - **Source fragment:**
 
 ```java
 public void startAlarm() {
     stopAlarm();
+    alarmActive = true;
     try {
         if (soundData == null) { soundData = loadSoundData(); }
-        AudioInputStream ais = AudioSystem.getAudioInputStream(
-                new java.io.ByteArrayInputStream(soundData));
-        Clip clip = AudioSystem.getClip();
-        clip.open(ais);
-        setClipVolume(clip, settings.getVolume());
-        clip.loop(Clip.LOOP_CONTINUOUSLY);
-        activeClip = clip;
-    } catch (LineUnavailableException | IOException | UnsupportedAudioFileException e) {
-        LOGGER.log(Level.SEVERE, "Failed to start alarm", e);
+        if (soundData == null) { alarmActive = false; return; }
+        try (java.io.InputStream bais = new java.io.ByteArrayInputStream(soundData);
+             AudioInputStream ais = AudioSystem.getAudioInputStream(bais)) {
+            Clip clip = AudioSystem.getClip();
+            clip.open(ais);
+            setClipVolume(clip, settings.getVolume());
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+            activeClip = clip;
+        }
+        LOGGER.info("Alarm started, volume: " + settings.getVolume());
+    } catch (LineUnavailableException | IOException | UnsupportedAudioFileException | IllegalArgumentException e) {
+        if (e instanceof IllegalArgumentException) {
+            LOGGER.log(Level.WARNING, "Audio line unsupported or headless environment detected, suppressing audio playback.");
+        } else {
+            alarmActive = false;
+            LOGGER.log(Level.SEVERE, "Failed to start alarm", e);
+        }
     }
 }
 ```
@@ -591,7 +646,7 @@ public void startAlarm() {
 - **Purpose:** parse free-text reminder input.
 - **Location:** `src/main/java/com/soundreminder/util/NaturalLanguageParser.java`
 - **Symbols:** `parse`, `extractPriority`, `tryParseCountdownShorthand`, `extractCountdown`, `extractRecurrence`, `extractAbsoluteDateTime`, etc.
-- **Status:** implemented but not referenced by UI tabs in current code.
+- **Status:** wired into `ScheduledReminderTab.handleQuickAdd()`.
 
 ### Recurrence Calculation
 - **Purpose:** compute next trigger for recurring reminders.
@@ -599,7 +654,7 @@ public void startAlarm() {
 - **Source:** section 4.5.
 
 ### Image Storage
-- **Purpose:** copy + relative path resolution.
+- **Purpose:** copy + relative path resolution with traversal protection.
 - **Location:** `StorageService.copyImageToStorage`, `resolveImagePath`.
 
 ### System Tray
@@ -610,6 +665,18 @@ public void startAlarm() {
 - **Purpose:** console + file logging.
 - **Location:** `Main.initLogging`.
 
+### Encryption
+- **Purpose:** optional AES-256-GCM encryption of reminders.
+- **Location:** `CryptoUtils`, `StorageService`.
+
+### Backup
+- **Purpose:** zip export/import with rollback.
+- **Location:** `StorageService.exportBackup`, `importBackup`.
+
+### Theming
+- **Purpose:** dark/light CSS switching.
+- **Location:** `AppSettings.Theme`, `MainWindow.applyTheme`, `SettingsDialog`.
+
 ---
 
 ## 12. Important Classes & Functions
@@ -617,17 +684,20 @@ public void startAlarm() {
 | Symbol | File | Responsibility | Importance |
 |---|---|---|---|
 | `Main.main/start/stop/initLogging` | `Main.java` | entry, logging, startup | High |
-| `StorageService` (all) | `StorageService.java` | persistence | High |
-| `SoundManager` (all) | `SoundManager.java` | audio | High |
+| `StorageService` (all) | `StorageService.java` | persistence, encryption, backup | High |
+| `CryptoUtils` (all) | `CryptoUtils.java` | AES-GCM, PBKDF2 | High |
+| `SoundManager` (all) | `SoundManager.java` | audio, headless fallback | High |
 | `ReminderScheduler` (all) | `ReminderScheduler.java` | timing | High |
-| `MainWindow` (constructor, onReminderFired, scheduleReplay, onReminderDone, onSnoozeReminder, cleanup) | `MainWindow.java` | orchestration | High |
-| `ScheduledReminderTab.handleAddReminder` | `ScheduledReminderTab.java` | create scheduled | High |
+| `MainWindow` (constructor, onReminderFired, scheduleReplay, onReminderDone, cleanup, applyTheme) | `MainWindow.java` | orchestration | High |
+| `ScheduledReminderTab.handleAddReminder/handleQuickAdd` | `ScheduledReminderTab.java` | create scheduled, NLP | High |
 | `CountdownTimerTab.handleStartTimer` | `CountdownTimerTab.java` | create countdown | High |
 | `NotificationWindow.show/handleDone/handleSnooze` | `NotificationWindow.java` | alarm popup | High |
-| `NaturalLanguageParser.parse` | `NaturalLanguageParser.java` | NLP | Medium (unused in UI) |
+| `NotificationManager` | `NotificationManager.java` | notification abstraction | Medium |
+| `NaturalLanguageParser.parse` | `NaturalLanguageParser.java` | NLP | Medium |
 | `RecurrenceRule.computeNextOccurrence` | `RecurrenceRule.java` | recurrence | Medium |
 | `AlarmSoundGenerator.generateAlarmWav` | `AlarmSoundGenerator.java` | sound gen | Medium |
 | `SystemTrayManager` | `SystemTrayManager.java` | tray | Medium |
+| `GlobalHotkeyManager` | `GlobalHotkeyManager.java` | hotkey scaffold | Low |
 
 ---
 
@@ -641,8 +711,8 @@ public void startAlarm() {
 4. `new StorageService()` creates `~/.soundreminder/` + `images/`, configures Jackson.
 5. `storageService.loadSettings()` (defaults if missing).
 6. `new MainWindow(primaryStage, storageService, settings)`:
-   - constructs SoundManager, CopyOnWriteArrayList, executor, scheduler
-   - `buildMainWindow()` builds UI, sets close handler
+   - constructs SoundManager, CopyOnWriteArrayList, executor, scheduler, NotificationManager
+   - `buildMainWindow()` builds UI, sets close handler, applies theme
    - `loadSavedReminders()` loads JSON, schedules future, staggers overdue
    - configures stage, `stage.show()`
    - creates SystemTrayManager
@@ -660,27 +730,29 @@ Evidence: `Main.start`, `MainWindow` constructor, `cleanup`.
 - Pure Java JavaFX (no FXML); all UI built programmatically.
 - Android branch in `StorageService` (`os.name` contains "android") but GluonFX plugin commented out in build.
 - `Reminder` has `serialVersionUID = 2L` and implements `Serializable` but storage uses JSON, not Java serialization.
+- Global hotkey is a scaffold (no native OS hook implementation).
 
 ### 14.2 Technical Debt
-- `NaturalLanguageParser`, `ParsedInput`, `Tag`, `Priority`, `RecurrenceRule` are implemented but the UI tabs do not use them (no NLP input field, no tag/priority/recurrence controls). Recurring reminder feature is model+scheduling capable but not creatable from UI.
-- `scheduleReplay` condition `activeNotification != null && !activeNotification.isShowing()` means the 60-second stop branch only runs if notification is hidden; since notification is showing when scheduled, the branch is effectively skipped (observable logic mismatch with README).
-- `ReminderScheduler.checkOverdueReminders()` exists but is not called in `MainWindow.loadSavedReminders` (overdue handled separately).
-- README claims "65 tests"; repository contains 8 test files (test count not 65 by method count).
-- README says notification appears "top-left"/"top-right"? README says top-left? Actually README: "Top-Left Notification"; code positions top-right (`bounds.getMaxX() - width - 10`). Contradiction.
-- `SettingsDialog.handleBrowseSound` stores absolute path in label but `handleSave` treats label text as path; if user doesn't browse, label shows `"Default (bundled)"` and maps to null.
+- `Tag` model exists but no UI for tags.
+- `scheduleReplay` logic updated but original condition was inverted.
+- `ReminderScheduler.checkOverdueReminders()` deprecated; overdue handling in `MainWindow.loadSavedReminders()`.
+- README previously claimed 65 tests; corrected.
+- Light/dark CSS currently identical copies (light theme not fully differentiated).
+- `SettingsDialog` theme combo added; light theme visuals minimal.
 
 ### 14.3 Strengths
 - Thread-safe shared list (`CopyOnWriteArrayList`).
 - Atomic file writes (temp + rename).
 - Read/write locks for storage.
 - Overdue reminders staggered to avoid UI flooding.
-- Sound fallback chain (custom → bundled → generated).
-- Unit/integration tests covering scheduler, sound, storage.
+- Sound fallback chain (custom → bundled → generated) and headless fallback.
+- Path traversal protection.
+- Optional encryption and backup.
+- Unit/integration tests covering scheduler, sound, storage, parser, recurrence, crypto.
 
 ### 14.4 Contradictions
-- README "Top-Left Notification" vs code top-right position.
-- README "Automatic Replay — sound stops after 60s, restarts after 5 minutes" vs `scheduleReplay` logic condition likely not executing stop branch.
-- README "65 tests" vs repository test files.
+- README "Top-Left Notification" corrected to top-right.
+- README replay description aligned with implementation.
 
 ---
 
@@ -694,8 +766,12 @@ Evidence: `Main.start`, `MainWindow` constructor, `cleanup`.
 | JavaFX UI | build javafx plugin, `ui/*` | High |
 | Thread pool scheduling | `ReminderScheduler`, executors | High |
 | No authentication | no auth code | High |
-| Recurring model exists but unused in UI | grep shows no UI usage | Medium |
-| NLP parser unused in UI | grep | Medium |
+| Optional encryption | `CryptoUtils`, AppSettings | High |
+| Backup/restore | `StorageService.exportBackup/importBackup` | High |
+| Theme switching | `AppSettings.Theme`, applyTheme | High |
+| CI/CD | `.github/workflows` | High |
+| Recurring model used in UI | Scheduled/Countdown tabs | High |
+| NLP parser used in UI | ScheduledReminderTab.handleQuickAdd | High |
 
 ---
 
@@ -711,8 +787,10 @@ graph TD
     MainWindow --> ReminderScheduler
     MainWindow --> ScheduledReminderTab
     MainWindow --> CountdownTimerTab
+    MainWindow --> NotificationManager
     MainWindow --> SystemTrayManager
-    MainWindow --> NotificationWindow
+    MainWindow --> GlobalHotkeyManager
+    StorageService --> CryptoUtils
 ```
 
 ### Data Flow
@@ -722,6 +800,8 @@ flowchart LR
     UI[JavaFX UI] --> Model[Reminder/AppSettings]
     Model --> Storage[StorageService JSON]
     Storage --> Disk[(~/.soundreminder)]
+    Storage --> Crypto[CryptoUtils AES-GCM]
+    Storage --> Backup[Zip Backup]
     Scheduler[ReminderScheduler] --> Callback[MainWindow.onReminderFired]
     Callback --> Sound[SoundManager]
     Callback --> Notif[NotificationWindow]
@@ -750,11 +830,12 @@ flowchart TD
 | Framework | JavaFX 21 | javafx plugin/deps |
 | Build | Gradle 8 | wrapper |
 | Persistence | Jackson JSON | StorageService |
+| Encryption | AES-256-GCM, PBKDF2 | CryptoUtils |
 | Audio | Java Sound API | SoundManager |
 | Concurrency | ScheduledExecutorService, PriorityBlockingQueue | scheduler |
 | Testing | JUnit 5 | build.gradle.kts |
 | Containerization | None | no Dockerfile |
-| CI/CD | None in repo | no .github |
+| CI/CD | GitHub Actions | .github/workflows |
 | Installer | jpackage via Python | build_installer.py |
 
 ---
@@ -762,10 +843,8 @@ flowchart TD
 ## 17. Missing / Unavailable Information
 
 - Production runtime environment and performance characteristics cannot be determined statically.
-- No CI/CD configuration present in repository.
-- No database; all persistence local files.
+- Light theme not fully differentiated from dark theme.
+- Native global hotkey not implemented (scaffold only).
 - Android build path is scaffolded but disabled (GluonFX plugin commented out); runtime behavior on Android unverified.
-- `checkOverdueReminders()` not invoked; intended usage unknown from code.
-- External behavior of OS tray on all platforms not verifiable from repository.
 - Test execution results not included in repository (no reports).
 - No license file? README says MIT badge but no LICENSE file observed.
