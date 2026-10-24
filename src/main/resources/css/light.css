@@ -5,70 +5,70 @@
 
 /* --- Root / Global --- */
 .root {
-    -fx-background-color: #1E1E1E;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #F5F5F5;
+    -fx-text-fill: #202020;
     -fx-font-family: "Segoe UI", "DejaVu Sans", "Arial", sans-serif;
     -fx-font-size: 13px;
 }
 
 /* --- Tab Pane --- */
 .main-tab-pane {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
     -fx-tab-min-width: 180px;
     -fx-tab-max-width: 220px;
 }
 
 .main-tab-pane .tab-header-area .tab-header-background {
-    -fx-background-color: #2D2D2D;
-    -fx-border-color: #3D3D3D;
+    -fx-background-color: #E8E8E8;
+    -fx-border-color: #D0D0D0;
     -fx-border-width: 0 0 1 0;
 }
 
 .main-tab-pane .tab {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
     -fx-padding: 8 20 8 20;
     -fx-background-radius: 0;
 }
 
 .main-tab-pane .tab:selected {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
     -fx-border-color: #0078D4;
     -fx-border-width: 0 0 2 0;
 }
 
 .main-tab-pane .tab .tab-label {
-    -fx-text-fill: #B0B0B0;
+    -fx-text-fill: #404040;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
 }
 
 .main-tab-pane .tab:selected .tab-label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
 }
 
 /* --- Tab Content --- */
 .tab-content {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
     -fx-spacing: 16;
 }
 
 /* --- Input Section --- */
 .input-section {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
     -fx-padding: 16;
     -fx-background-radius: 4;
 }
 
 /* --- Labels --- */
 .field-label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-min-width: 80px;
 }
 
 .section-label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
     -fx-padding: 8 0 4 0;
@@ -76,42 +76,42 @@
 
 /* --- DatePicker --- */
 .date-picker {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
 }
 
 .date-picker .arrow-button {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
 }
 
 .date-picker .text-field {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
 }
 
 .date-picker-popup .month-year-pane {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
 }
 
 .date-picker-popup .calendar-grid {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
 }
 
 /* --- Time Picker (ComboBox) --- */
 .time-picker {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
 }
 
 .time-picker .text-field {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
 }
 
 /* --- TextArea --- */
 .message-area {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
     -fx-border-color: #4D4D4D;
     -fx-border-width: 1;
     -fx-border-radius: 2;
@@ -119,7 +119,7 @@
 }
 
 .message-area .content {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
 }
 
 /* --- Attached Image Label --- */
@@ -149,8 +149,8 @@
 }
 
 .btn-secondary {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
     -fx-font-size: 13px;
     -fx-padding: 8 16 8 16;
     -fx-background-radius: 2;
@@ -165,7 +165,7 @@
 }
 
 .btn-secondary:pressed {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
 }
 
 .btn-delete {
@@ -187,31 +187,31 @@
 
 /* --- ListView --- */
 .reminders-list {
-    -fx-background-color: #2D2D2D;
-    -fx-border-color: #3D3D3D;
+    -fx-background-color: #E8E8E8;
+    -fx-border-color: #D0D0D0;
     -fx-border-width: 1;
     -fx-border-radius: 2;
-    -fx-control-inner-background: #2D2D2D;
-    -fx-control-inner-background-alt: #333333;
+    -fx-control-inner-background: #E8E8E8;
+    -fx-control-inner-background-alt: #202020;
 }
 
 .reminders-list .list-cell {
-    -fx-background-color: #2D2D2D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #E8E8E8;
+    -fx-text-fill: #202020;
     -fx-padding: 4 0 4 0;
 }
 
 .reminders-list .list-cell:filled:selected {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
 }
 
 .reminders-list .list-cell:filled:hover {
-    -fx-background-color: #383838;
+    -fx-background-color: #E5E5E5;
 }
 
 .reminders-list .list-cell:empty {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
 }
 
 /* --- Reminder List Cell Labels --- */
@@ -222,7 +222,7 @@
 }
 
 .reminder-message-label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 13px;
 }
 
@@ -235,18 +235,18 @@
 }
 
 .time-unit-label {
-    -fx-text-fill: #B0B0B0;
+    -fx-text-fill: #404040;
     -fx-font-size: 13px;
 }
 
 /* --- Timer Spinner --- */
 .timer-spinner {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
 }
 
 .timer-spinner .text-field {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
     -fx-alignment: center;
 }
 
@@ -257,27 +257,27 @@
 
 /* --- Notification Window --- */
 .notification-root {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
     -fx-border-color: #0078D4;
     -fx-border-width: 2;
     -fx-effect: null;
 }
 
 .notification-message {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-wrap-text: true;
 }
 
 .notification-done-checkbox {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
 }
 
 .notification-done-checkbox .box {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
     -fx-border-color: #4D4D4D;
     -fx-border-width: 1;
 }
@@ -288,11 +288,11 @@
 
 /* --- Settings Dialog --- */
 .settings-dialog {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
 }
 
 .sound-path-label {
-    -fx-text-fill: #B0B0B0;
+    -fx-text-fill: #404040;
     -fx-font-size: 12px;
 }
 
@@ -311,7 +311,7 @@
 }
 
 .volume-value-label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-alignment: center-right;
@@ -319,8 +319,8 @@
 
 /* --- Main Toolbar --- */
 .main-toolbar {
-    -fx-background-color: #2D2D2D;
-    -fx-border-color: #3D3D3D;
+    -fx-background-color: #E8E8E8;
+    -fx-border-color: #D0D0D0;
     -fx-border-width: 0 0 1 0;
 }
 
@@ -331,13 +331,13 @@
 
 /* --- Separator --- */
 .separator .line {
-    -fx-border-color: #3D3D3D;
+    -fx-border-color: #D0D0D0;
     -fx-border-width: 1;
 }
 
 /* --- ScrollBar --- */
 .scroll-bar {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
 }
 
 .scroll-bar .thumb {
@@ -351,30 +351,30 @@
 
 .scroll-bar .increment-button,
 .scroll-bar .decrement-button {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
     -fx-padding: 0;
 }
 
 /* --- Tooltip --- */
 .tooltip {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
     -fx-font-size: 12px;
     -fx-background-radius: 2;
 }
 
 /* --- Alert Dialog --- */
 .dialog-pane {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
 }
 
 .dialog-pane .label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
 }
 
 .dialog-pane .button {
-    -fx-background-color: #3D3D3D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #D0D0D0;
+    -fx-text-fill: #202020;
     -fx-border-color: #4D4D4D;
     -fx-border-width: 1;
     -fx-padding: 6 16 6 16;
@@ -390,39 +390,39 @@
 }
 
 .dialog-pane .header-panel {
-    -fx-background-color: #2D2D2D;
+    -fx-background-color: #E8E8E8;
 }
 
 .dialog-pane .header-panel .label {
-    -fx-text-fill: #E0E0E0;
+    -fx-text-fill: #202020;
     -fx-font-size: 16px;
     -fx-font-weight: bold;
 }
 
 /* --- File Chooser --- */
 .file-chooser {
-    -fx-background-color: #1E1E1E;
+    -fx-background-color: #F5F5F5;
 }
 
 /* --- MenuBar / ContextMenu (for tray alternative) --- */
 .context-menu {
-    -fx-background-color: #2D2D2D;
-    -fx-border-color: #3D3D3D;
+    -fx-background-color: #E8E8E8;
+    -fx-border-color: #D0D0D0;
     -fx-border-width: 1;
 }
 
 .context-menu .menu-item {
-    -fx-background-color: #2D2D2D;
-    -fx-text-fill: #E0E0E0;
+    -fx-background-color: #E8E8E8;
+    -fx-text-fill: #202020;
 }
 
 .context-menu .menu-item:hover {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
 }
 
 /* --- Checkbox (general) --- */
 .check-box .box {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
     -fx-border-color: #4D4D4D;
     -fx-border-width: 1;
 }
@@ -432,6 +432,6 @@
 }
 
 .check-box:selected .box {
-    -fx-background-color: #3D3D3D;
+    -fx-background-color: #D0D0D0;
     -fx-border-color: #0078D4;
 }
