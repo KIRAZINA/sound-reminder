@@ -1,5 +1,8 @@
 package com.soundreminder.ui;
 
+import com.soundreminder.model.Priority;
+import com.soundreminder.model.RecurrenceRule;
+import com.soundreminder.model.RecurrenceRule.Frequency;
 import com.soundreminder.model.Reminder;
 import com.soundreminder.model.ReminderType;
 import com.soundreminder.sound.SoundManager;
@@ -58,6 +61,8 @@ public class CountdownTimerTab extends Tab {
     private TextArea messageArea;
     private Label attachedImageLabel;
     private String selectedImagePath;
+    private ComboBox<Priority> priorityCombo;
+    private ComboBox<String> recurrenceCombo;
     private Button attachImageButton;
     private Button startTimerButton;
     private ListView<TimerDisplay> timersList;
@@ -143,6 +148,21 @@ public class CountdownTimerTab extends Tab {
         attachedImageLabel = new Label("No image attached");
         attachedImageLabel.getStyleClass().add("attached-image-label");
 
+        // Priority / Recurrence row
+        HBox metaRow = new HBox(12);
+        metaRow.setAlignment(Pos.CENTER_LEFT);
+        Label priorityLabel = new Label("Priority:");
+        priorityLabel.getStyleClass().add("field-label");
+        priorityCombo = new ComboBox<>();
+        priorityCombo.getItems().addAll(Priority.values());
+        priorityCombo.setValue(Priority.NORMAL);
+        Label recurrenceLabel = new Label("Repeat:");
+        recurrenceLabel.getStyleClass().add("field-label");
+        recurrenceCombo = new ComboBox<>();
+        recurrenceCombo.getItems().addAll("None", "Daily", "Weekly", "Monthly", "Yearly");
+        recurrenceCombo.setValue("None");
+        metaRow.getChildren().addAll(priorityLabel, priorityCombo, recurrenceLabel, recurrenceCombo);
+
         // Buttons row
         HBox buttonRow = new HBox(12);
         buttonRow.setAlignment(Pos.CENTER_LEFT);
@@ -158,7 +178,7 @@ public class CountdownTimerTab extends Tab {
         buttonRow.getChildren().addAll(attachImageButton, startTimerButton);
 
         inputSection.getChildren().addAll(durationRow, messageLabel, messageArea,
-                attachedImageLabel, buttonRow);
+                attachedImageLabel, metaRow, buttonRow);
 
         // --- Active Timers List ---
         Label listLabel = new Label("Active Countdown Timers:");
@@ -170,7 +190,7 @@ public class CountdownTimerTab extends Tab {
         timersList.setPrefHeight(200);
 
         root.getChildren().addAll(inputSection, listLabel, timersList);
-        VBox.setVgrow(timersList, Priority.ALWAYS);
+        VBox.setVgrow(timersList, javafx.scene.layout.Priority.ALWAYS);
 
         setContent(root);
     }
@@ -235,14 +255,19 @@ public class CountdownTimerTab extends Tab {
             return;
         }
 
-        // Calculate trigger time: now + duration
         LocalDateTime triggerTime = LocalDateTime.now().plusSeconds(totalSeconds);
+
+        Priority priority = priorityCombo.getValue() != null ? priorityCombo.getValue() : Priority.NORMAL;
+        RecurrenceRule recurrence = buildRecurrenceRule(recurrenceCombo.getValue());
 
         Reminder reminder = new Reminder(
                 ReminderType.COUNTDOWN,
                 triggerTime,
                 message,
-                selectedImagePath
+                selectedImagePath,
+                recurrence,
+                priority,
+                new java.util.HashSet<>()
         );
 
         // Add to shared list
@@ -261,6 +286,8 @@ public class CountdownTimerTab extends Tab {
         hoursSpinner.getValueFactory().setValue(0);
         minutesSpinner.getValueFactory().setValue(5);
         secondsSpinner.getValueFactory().setValue(0);
+        priorityCombo.setValue(Priority.NORMAL);
+        recurrenceCombo.setValue("None");
 
         refreshList();
         LOGGER.info("New countdown timer started: " + reminder.getId());
@@ -312,7 +339,7 @@ public class CountdownTimerTab extends Tab {
                     }
                 });
 
-                HBox.setHgrow(spacer, Priority.ALWAYS);
+                HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
                 content.setAlignment(Pos.CENTER_LEFT);
                 content.setPadding(new Insets(8));
                 content.getChildren().addAll(thumbnail, textContent, spacer, cancelButton);
@@ -353,6 +380,18 @@ public class CountdownTimerTab extends Tab {
                 }
             }
         };
+    }
+
+    /**
+     * Builds a RecurrenceRule from a combo box value.
+     */
+    private RecurrenceRule buildRecurrenceRule(String value) {
+        if (value == null || value.equals("None")) return null;
+        RecurrenceRule rule = new RecurrenceRule();
+        rule.setFrequency(Frequency.valueOf(value.toUpperCase()));
+        rule.setInterval(1);
+        rule.setDescription(value.toLowerCase());
+        return rule;
     }
 
     /**

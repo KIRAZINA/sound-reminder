@@ -1,7 +1,12 @@
 package com.soundreminder.ui;
 
+import com.soundreminder.model.Priority;
+import com.soundreminder.model.RecurrenceRule;
+import com.soundreminder.model.RecurrenceRule.Frequency;
 import com.soundreminder.model.Reminder;
 import com.soundreminder.model.ReminderType;
+import com.soundreminder.util.NaturalLanguageParser;
+import com.soundreminder.model.ParsedInput;
 import com.soundreminder.sound.SoundManager;
 import com.soundreminder.storage.StorageService;
 
@@ -58,6 +63,9 @@ public class ScheduledReminderTab extends Tab {
     private TextArea messageArea;
     private Label attachedImageLabel;
     private String selectedImagePath;
+    private ComboBox<Priority> priorityCombo;
+    private ComboBox<String> recurrenceCombo;
+    private TextField quickAddField;
     private Button attachImageButton;
     private Button addReminderButton;
     private ListView<Reminder> remindersList;
@@ -99,7 +107,34 @@ public class ScheduledReminderTab extends Tab {
         VBox inputSection = new VBox(12);
         inputSection.getStyleClass().add("input-section");
 
-        // Date picker row
+        // Quick Add (NLP) row
+        HBox quickRow = new HBox(12);
+        quickRow.setAlignment(Pos.CENTER_LEFT);
+        Label quickLabel = new Label("Quick Add:");
+        quickLabel.getStyleClass().add("field-label");
+        quickAddField = new TextField();
+        quickAddField.setPromptText("e.g. in 20 minutes meeting !high");
+        quickAddField.setPrefWidth(320);
+        Button quickAddButton = new Button("Parse");
+        quickAddButton.getStyleClass().add("btn-secondary");
+        quickAddButton.setOnAction(e -> handleQuickAdd());
+        quickRow.getChildren().addAll(quickLabel, quickAddField, quickAddButton);
+
+        // Date picker row (existing)
+        // Priority / Recurrence row
+        HBox metaRow = new HBox(12);
+        metaRow.setAlignment(Pos.CENTER_LEFT);
+        Label priorityLabel = new Label("Priority:");
+        priorityLabel.getStyleClass().add("field-label");
+        priorityCombo = new ComboBox<>();
+        priorityCombo.getItems().addAll(Priority.values());
+        priorityCombo.setValue(Priority.NORMAL);
+        Label recurrenceLabel = new Label("Repeat:");
+        recurrenceLabel.getStyleClass().add("field-label");
+        recurrenceCombo = new ComboBox<>();
+        recurrenceCombo.getItems().addAll("None", "Daily", "Weekly", "Monthly", "Yearly");
+        recurrenceCombo.setValue("None");
+        metaRow.getChildren().addAll(priorityLabel, priorityCombo, recurrenceLabel, recurrenceCombo);
         HBox dateRow = new HBox(12);
         dateRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -151,8 +186,8 @@ public class ScheduledReminderTab extends Tab {
 
         buttonRow.getChildren().addAll(attachImageButton, addReminderButton);
 
-        inputSection.getChildren().addAll(dateRow, timeRow, messageLabel, messageArea,
-                attachedImageLabel, buttonRow);
+        inputSection.getChildren().addAll(quickRow, dateRow, timeRow, messageLabel, messageArea,
+                metaRow, attachedImageLabel, buttonRow);
 
         // --- Active Reminders List ---
         Label listLabel = new Label("Active Scheduled Reminders:");
@@ -164,7 +199,7 @@ public class ScheduledReminderTab extends Tab {
         remindersList.setPrefHeight(200);
 
         root.getChildren().addAll(inputSection, listLabel, remindersList);
-        VBox.setVgrow(remindersList, Priority.ALWAYS);
+        VBox.setVgrow(remindersList, javafx.scene.layout.Priority.ALWAYS);
 
         setContent(root);
         refreshList();
@@ -259,11 +294,17 @@ public class ScheduledReminderTab extends Tab {
             return;
         }
 
+        Priority priority = priorityCombo.getValue() != null ? priorityCombo.getValue() : Priority.NORMAL;
+        RecurrenceRule recurrence = buildRecurrenceRule(recurrenceCombo.getValue());
+
         Reminder reminder = new Reminder(
                 ReminderType.SCHEDULED,
                 triggerTime,
                 message,
-                selectedImagePath
+                selectedImagePath,
+                recurrence,
+                priority,
+                new java.util.HashSet<>()
         );
 
         // Add to shared list
@@ -281,6 +322,8 @@ public class ScheduledReminderTab extends Tab {
         attachedImageLabel.setText("No image attached");
         datePicker.setValue(LocalDate.now());
         timePicker.setValue(LocalTime.now().withMinute(LocalTime.now().getMinute() / 5 * 5).withSecond(0));
+        priorityCombo.setValue(Priority.NORMAL);
+        recurrenceCombo.setValue("None");
 
         refreshList();
         LOGGER.info("New scheduled reminder added: " + reminder.getId());
@@ -331,7 +374,7 @@ public class ScheduledReminderTab extends Tab {
                     }
                 });
 
-                HBox.setHgrow(spacer, Priority.ALWAYS);
+                HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
                 content.setAlignment(Pos.CENTER_LEFT);
                 content.setPadding(new Insets(8));
                 content.getChildren().addAll(thumbnail, textContent, spacer, deleteButton);
@@ -376,8 +419,52 @@ public class ScheduledReminderTab extends Tab {
     }
 
     /**
-     * Refreshes the list view with current active scheduled reminders.
+     * Builds a RecurrenceRule from a combo box value.
      */
+    private RecurrenceRule buildRecurrenceRule(String value) {
+        if (value == null || value.equals("None")) return null;
+        RecurrenceRule rule = new RecurrenceRule();
+        rule.setFrequency(Frequency.valueOf(value.toUpperCase()));
+        rule.setInterval(1);
+        rule.setDescription(value.toLowerCase());
+        return rule;
+    }
+
+    /**
+     * Parses free text into the form fields using NaturalLanguageParser.
+     */
+    private void handleQuickAdd() {
+        String text = quickAddField.getText();
+        if (text == null || text.isBlank()) {
+            showAlert("Validation Error", "Please enter text to parse.");
+            return;
+        }
+        ParsedInput parsed = new NaturalLanguageParser().parse(text);
+        if (parsed.hasError()) {
+            showAlert("Parse Error", parsed.getError());
+            return;
+        }
+        if (parsed.isCountdown()) {
+            LocalDateTime trigger = LocalDateTime.now().plusSeconds(parsed.getCountdownSeconds());
+            datePicker.setValue(trigger.toLocalDate());
+            timePicker.setValue(trigger.toLocalTime().withSecond(0).withNano(0));
+        } else if (parsed.getTriggerDateTime() != null) {
+            LocalDateTime trigger = parsed.getTriggerDateTime();
+            datePicker.setValue(trigger.toLocalDate());
+            timePicker.setValue(trigger.toLocalTime().withSecond(0).withNano(0));
+        }
+        if (parsed.getMessage() != null && !parsed.getMessage().isBlank()) {
+            messageArea.setText(parsed.getMessage());
+        }
+        if (parsed.getPriority() != null) {
+            priorityCombo.setValue(parsed.getPriority());
+        }
+        if (parsed.getRecurrenceRule() != null) {
+            String name = parsed.getRecurrenceRule().getFrequency().name();
+            name = name.charAt(0) + name.substring(1).toLowerCase();
+            recurrenceCombo.setValue(name);
+        }
+    }
     public void refreshList() {
         List<Reminder> scheduled = allReminders.stream()
                 .filter(r -> r.getType() == ReminderType.SCHEDULED && r.isActive())

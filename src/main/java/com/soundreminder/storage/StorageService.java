@@ -87,16 +87,28 @@ public class StorageService {
                 return new ArrayList<>();
             }
 
-            String json = Files.readString(remindersFile);
-            if (json == null || json.isBlank()) {
-                return new ArrayList<>();
+            String json;
+            AppSettings settings = loadSettings();
+            if (settings.isEncryptionEnabled() && settings.getEncryptionPassword() != null
+                    && !settings.getEncryptionPassword().isBlank()) {
+                String encrypted = Files.readString(remindersFile).trim();
+                if (encrypted.isBlank()) {
+                    return new ArrayList<>();
+                }
+                json = com.soundreminder.util.CryptoUtils.decryptFromBase64(
+                        encrypted, settings.getEncryptionPassword().toCharArray());
+            } else {
+                json = Files.readString(remindersFile);
+                if (json == null || json.isBlank()) {
+                    return new ArrayList<>();
+                }
             }
 
             List<Reminder> reminders = objectMapper.readValue(json,
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Reminder.class));
             LOGGER.info("Loaded " + reminders.size() + " reminders from disk");
             return reminders;
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to load reminders", e);
             return new ArrayList<>();
         } finally {
@@ -111,16 +123,34 @@ public class StorageService {
      */
     public void saveReminders(List<Reminder> reminders) {
         lock.writeLock().lock();
+        Path tempFile = null;
         try {
-            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(reminders);
+            AppSettings settings = loadSettings();
+            String content;
+            if (settings.isEncryptionEnabled() && settings.getEncryptionPassword() != null
+                    && !settings.getEncryptionPassword().isBlank()) {
+                String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(reminders);
+                content = com.soundreminder.util.CryptoUtils.encryptToBase64(
+                        json, settings.getEncryptionPassword().toCharArray());
+            } else {
+                content = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(reminders);
+            }
+
             // Write to temp file first, then rename for atomicity
-            Path tempFile = remindersFile.resolveSibling("reminders.json.tmp");
-            Files.writeString(tempFile, json);
+            tempFile = remindersFile.resolveSibling("reminders.json.tmp");
+            Files.writeString(tempFile, content);
             Files.move(tempFile, remindersFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            tempFile = null;
             LOGGER.info("Saved " + reminders.size() + " reminders to disk");
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to save reminders", e);
         } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                }
+            }
             lock.writeLock().unlock();
         }
     }
@@ -161,15 +191,23 @@ public class StorageService {
      */
     public void saveSettings(AppSettings settings) {
         lock.writeLock().lock();
+        Path tempFile = null;
         try {
             String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(settings);
-            Path tempFile = settingsFile.resolveSibling("settings.json.tmp");
+            tempFile = settingsFile.resolveSibling("settings.json.tmp");
             Files.writeString(tempFile, json);
             Files.move(tempFile, settingsFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            tempFile = null;
             LOGGER.info("Saved settings to disk");
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to save settings", e);
         } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                }
+            }
             lock.writeLock().unlock();
         }
     }
@@ -183,7 +221,11 @@ public class StorageService {
      * @throws IOException if the copy operation fails
      */
     public String copyImageToStorage(Path sourcePath) throws IOException {
-        String fileName = sourcePath.getFileName().toString();
+        Path sourceFileName = sourcePath.getFileName();
+        if (sourceFileName == null) {
+            throw new IllegalArgumentException("Source path must include a file name");
+        }
+        String fileName = sourceFileName.toString();
         String timestamp = String.valueOf(System.currentTimeMillis());
         String newName = timestamp + "_" + fileName;
         Path destPath = imagesDir.resolve(newName);
@@ -205,11 +247,148 @@ public class StorageService {
         if (imagePath == null || imagePath.isBlank()) {
             return null;
         }
-        Path path = Path.of(imagePath);
+        Path path = Path.of(imagePath).normalize();
         if (path.isAbsolute()) {
-            return path;
+            return null;
         }
-        return baseDir.resolve(path).normalize();
+        Path resolved = baseDir.resolve(path).normalize();
+        if (!resolved.startsWith(baseDir)) {
+            return null;
+        }
+        return resolved;
+    }
+
+    /**
+     * Exports reminders, settings, and images into a zip archive.
+     */
+    public void exportBackup(Path destinationZip) throws IOException {
+        lock.writeLock().lock();
+        try {
+            if (destinationZip.getParent() != null) {
+                Files.createDirectories(destinationZip.getParent());
+            }
+            try (java.util.zip.ZipOutputStream zos =
+                         new java.util.zip.ZipOutputStream(Files.newOutputStream(destinationZip))) {
+                addFileToZip(zos, remindersFile, "reminders.json");
+                addFileToZip(zos, settingsFile, "settings.json");
+                if (Files.exists(imagesDir)) {
+                    Files.walk(imagesDir).filter(Files::isRegularFile).forEach(path -> {
+                        String entryName = "images/" + imagesDir.relativize(path).toString().replace("\\", "/");
+                        try {
+                            zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+                            Files.copy(path, zos);
+                            zos.closeEntry();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                }
+            }
+            LOGGER.info("Backup exported to: " + destinationZip);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    private void addFileToZip(java.util.zip.ZipOutputStream zos, Path file, String entryName) throws IOException {
+        if (!Files.exists(file)) return;
+        zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+        Files.copy(file, zos);
+        zos.closeEntry();
+    }
+
+    /**
+     * Imports a backup zip, replacing current files and images.
+     */
+    public void importBackup(Path sourceZip) throws IOException {
+        lock.writeLock().lock();
+        Path rollbackDir = null;
+        try {
+            rollbackDir = Files.createTempDirectory("soundreminder-rollback-");
+            // rollback current state
+            if (Files.exists(remindersFile)) {
+                Files.copy(remindersFile, rollbackDir.resolve("reminders.json"),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            if (Files.exists(settingsFile)) {
+                Files.copy(settingsFile, rollbackDir.resolve("settings.json"),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            if (Files.exists(imagesDir)) {
+                Path rollbackImages = rollbackDir.resolve("images");
+                Files.createDirectories(rollbackImages);
+                Files.walk(imagesDir).filter(Files::isRegularFile).forEach(p -> {
+                    try {
+                        Path target = rollbackImages.resolve(imagesDir.relativize(p).toString());
+                        Files.createDirectories(target.getParent());
+                        Files.copy(p, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+
+            // extract
+            try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(Files.newInputStream(sourceZip))) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) {
+                        zis.closeEntry();
+                        continue;
+                    }
+                    String name = entry.getName().replace("\\", "/");
+                    if (name.contains("..")) {
+                        throw new IOException("Unsafe zip entry: " + name);
+                    }
+                    Path target;
+                    if (name.equals("reminders.json")) {
+                        target = remindersFile;
+                    } else if (name.equals("settings.json")) {
+                        target = settingsFile;
+                    } else if (name.startsWith("images/")) {
+                        target = imagesDir.resolve(name.substring("images/".length()));
+                    } else {
+                        zis.closeEntry();
+                        continue;
+                    }
+                    if (target.getParent() != null) {
+                        Files.createDirectories(target.getParent());
+                    }
+                    Files.copy(zis, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    zis.closeEntry();
+                }
+            }
+            LOGGER.info("Backup imported from: " + sourceZip);
+        } catch (Exception e) {
+            // rollback
+            if (rollbackDir != null) {
+                try {
+                    if (Files.exists(rollbackDir.resolve("reminders.json"))) {
+                        Files.copy(rollbackDir.resolve("reminders.json"), remindersFile,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    if (Files.exists(rollbackDir.resolve("settings.json"))) {
+                        Files.copy(rollbackDir.resolve("settings.json"), settingsFile,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException ignored) {
+                }
+            }
+            if (e instanceof IOException) throw (IOException) e;
+            throw new IOException(e);
+        } finally {
+            if (rollbackDir != null) {
+                try {
+                    Files.walk(rollbackDir)
+                            .sorted(java.util.Comparator.reverseOrder())
+                            .forEach(p -> {
+                                try { Files.deleteIfExists(p); } catch (IOException ignored) { }
+                            });
+                } catch (IOException ignored) {
+                }
+            }
+            lock.writeLock().unlock();
+        }
     }
 
     /**

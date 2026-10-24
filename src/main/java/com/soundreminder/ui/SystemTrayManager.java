@@ -40,6 +40,9 @@ public class SystemTrayManager {
     /** Provider for the list of active reminders. */
     private final ReminderProvider reminderProvider;
 
+    /** Cleanup callback invoked before application shutdown. */
+    private final Runnable cleanupCallback;
+
     /**
      * Functional interface for providing the current list of active reminders.
      */
@@ -54,9 +57,10 @@ public class SystemTrayManager {
      * @param mainStage         the main application stage
      * @param reminderProvider  provider for active reminders
      */
-    public SystemTrayManager(Stage mainStage, ReminderProvider reminderProvider) {
+    public SystemTrayManager(Stage mainStage, ReminderProvider reminderProvider, Runnable cleanupCallback) {
         this.mainStage = mainStage;
         this.reminderProvider = reminderProvider;
+        this.cleanupCallback = cleanupCallback;
         this.systemTray = SystemTray.isSupported() ? SystemTray.getSystemTray() : null;
 
         if (systemTray != null) {
@@ -93,7 +97,12 @@ public class SystemTrayManager {
 
             // "Exit" menu item
             MenuItem exitItem = new MenuItem("Exit");
-            exitItem.addActionListener(e -> Platform.exit());
+            exitItem.addActionListener(e -> Platform.runLater(() -> {
+                if (cleanupCallback != null) {
+                    cleanupCallback.run();
+                }
+                Platform.exit();
+            }));
             popup.add(exitItem);
 
             // Create tray icon

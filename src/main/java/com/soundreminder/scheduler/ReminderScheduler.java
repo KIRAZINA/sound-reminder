@@ -34,7 +34,7 @@ public class ReminderScheduler {
     private final ReentrantLock schedulingLock = new ReentrantLock();
 
     /** Currently scheduled future task, cancelled before scheduling a new one to prevent duplicates. */
-    private ScheduledFuture<?> scheduledFuture;
+    private volatile ScheduledFuture<?> scheduledFuture;
 
     /**
      * Creates a new ReminderScheduler.
@@ -96,9 +96,14 @@ public class ReminderScheduler {
      * Removes all reminders from the queue and cancels any pending scheduled tasks.
      */
     public synchronized void clear() {
-        if (scheduledFuture != null && !scheduledFuture.isDone()) {
-            scheduledFuture.cancel(false);
-            scheduledFuture = null;
+        schedulingLock.lock();
+        try {
+            if (scheduledFuture != null && !scheduledFuture.isDone()) {
+                scheduledFuture.cancel(false);
+                scheduledFuture = null;
+            }
+        } finally {
+            schedulingLock.unlock();
         }
         reminderQueue.clear();
         LOGGER.info("Cleared all scheduled reminders");
@@ -107,7 +112,10 @@ public class ReminderScheduler {
     /**
      * Checks for any reminders that should have already fired and fires them immediately.
      * Call this on startup to catch reminders that were due while the app was not running.
+     * @deprecated Overdue handling is performed by MainWindow.loadSavedReminders(); this method
+     * is retained for compatibility but is not invoked during normal startup.
      */
+    @Deprecated
     public synchronized void checkOverdueReminders() {
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         reminderQueue.removeIf(reminder -> {

@@ -61,13 +61,13 @@ public class MainWindow {
     private final CopyOnWriteArrayList<Reminder> allReminders;
 
     /** Currently active notification window. */
-    private NotificationWindow activeNotification;
+    private volatile NotificationWindow activeNotification;
 
     /** Currently firing reminder (for replay logic). */
-    private Reminder currentlyFiringReminder;
+    private volatile Reminder currentlyFiringReminder;
 
     /** Number of times the current reminder has been replayed. */
-    private int replayCount;
+    private volatile int replayCount;
 
     // UI Components
     private TabPane tabPane;
@@ -110,7 +110,8 @@ public class MainWindow {
 
         // Initialize system tray (desktop only)
         systemTrayManager = new SystemTrayManager(stage, () ->
-                allReminders.stream().filter(Reminder::isActive).toList()
+                allReminders.stream().filter(Reminder::isActive).toList(),
+                this::cleanup
         );
 
         LOGGER.info("Main window initialized");
@@ -296,12 +297,11 @@ public class MainWindow {
         // Stop sound after 60 seconds
         executorService.schedule(() -> {
             if (currentlyFiringReminder != null &&
-                    currentlyFiringReminder.getId().equals(reminder.getId()) &&
-                    activeNotification != null && !activeNotification.isShowing()) {
+                    currentlyFiringReminder.getId().equals(reminder.getId())) {
 
-                // Sound already stopped by notification hide, but ensure it's stopped
+                // Stop alarm playback after 60 seconds
                 soundManager.stopAlarm();
-                LOGGER.info("Sound stopped after 60 seconds of silence");
+                LOGGER.info("Sound stopped after 60 seconds");
 
                 // Restart after 5 minutes (300 seconds) total from original trigger
                 // which is 240 seconds after the 60-second stop

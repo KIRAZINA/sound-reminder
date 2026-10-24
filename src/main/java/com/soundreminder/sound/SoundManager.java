@@ -71,17 +71,18 @@ public class SoundManager {
             }
 
             // Create a new Clip from the cached audio data
-            AudioInputStream ais = AudioSystem.getAudioInputStream(
-                    new java.io.ByteArrayInputStream(soundData));
-            Clip clip = AudioSystem.getClip();
-            clip.open(ais);
+            try (java.io.InputStream bais = new java.io.ByteArrayInputStream(soundData);
+                 AudioInputStream ais = AudioSystem.getAudioInputStream(bais)) {
+                Clip clip = AudioSystem.getClip();
+                clip.open(ais);
 
-            // Set volume according to settings
-            setClipVolume(clip, settings.getVolume());
+                // Set volume according to settings
+                setClipVolume(clip, settings.getVolume());
 
-            // Start looping indefinitely
-            clip.loop(Clip.LOOP_CONTINUOUSLY);
-            activeClip = clip;
+                // Start looping indefinitely
+                clip.loop(Clip.LOOP_CONTINUOUSLY);
+                activeClip = clip;
+            }
 
             LOGGER.info("Alarm started, volume: " + settings.getVolume());
         } catch (LineUnavailableException | IOException | UnsupportedAudioFileException e) {

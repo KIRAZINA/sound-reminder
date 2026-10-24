@@ -24,7 +24,7 @@ See the [Building](#building) section below.
 - **Countdown Timers** — Set hours, minutes, seconds with a custom message and image
 - **Persistent Storage** — All reminders and settings survive app restarts
 - **Loud Alarm Sound** — Clear, attention-grabbing sound with volume control
-- **Top-Left Notification** — Pop-up with message, attached image, and "Mark as Done" checkbox
+- **Top-Right Notification** — Pop-up with message, attached image, and "Mark as Done" checkbox
 - **Automatic Replay** — If not acknowledged: sound stops after 60s, restarts after 5 minutes, repeats
 - **System Tray** — Minimize to tray; quick access to pending reminders
 - **Dark Theme UI** — Modern, clean, flat design
@@ -125,7 +125,7 @@ SoundReminder/
 │           ├── css/styles.css
 │           ├── sounds/alarm.wav
 │           └── icons/tray-icon.png
-└── src/test/                     # Unit and integration tests (65 tests)
+└── src/test/                     # Unit and integration tests
 ```
 
 ## Technical Details

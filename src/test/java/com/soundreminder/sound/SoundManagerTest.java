@@ -215,9 +215,18 @@ class SoundManagerTest {
         });
     }
 
-    /**
-     * Generates a minimal valid WAV file (0.1 second of silence).
-     */
+    @Test
+    @DisplayName("Repeated start/stop cycles do not throw")
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void testRepeatedStartStop() {
+        assertDoesNotThrow(() -> {
+            for (int i = 0; i < 5; i++) {
+                soundManager.startAlarm();
+                Thread.sleep(50);
+                soundManager.stopAlarm();
+            }
+        });
+    }
     private byte[] generateSmallWav() throws IOException {
         int sampleRate = 44100;
         short channels = 1;

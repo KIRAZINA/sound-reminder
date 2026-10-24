@@ -17,10 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for ReminderScheduler.
- * Tests scheduling logic, overdue detection, and firing callbacks.
- */
 class SchedulerTest {
 
     private ScheduledExecutorService executorService;
@@ -186,5 +182,27 @@ class SchedulerTest {
 
         scheduler.schedule(reminder);
         assertEquals(1, scheduler.getPendingCount());
+    }
+
+    @Test
+    @DisplayName("Reminder with priority and recurrence can be scheduled")
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void testPriorityAndRecurringScheduling() {
+        Reminder reminder = new Reminder(
+                ReminderType.SCHEDULED,
+                LocalDateTime.now().plusSeconds(1),
+                "Recurring high priority",
+                null,
+                new com.soundreminder.model.RecurrenceRule(),
+                com.soundreminder.model.Priority.HIGH,
+                new java.util.HashSet<>()
+        );
+        com.soundreminder.model.RecurrenceRule rule = reminder.getRecurrenceRule();
+        rule.setFrequency(com.soundreminder.model.RecurrenceRule.Frequency.DAILY);
+        reminder.setRecurrenceRule(rule);
+
+        scheduler.schedule(reminder);
+        assertEquals(1, scheduler.getPendingCount());
+        assertEquals(com.soundreminder.model.Priority.HIGH, reminder.getPriority());
     }
 }

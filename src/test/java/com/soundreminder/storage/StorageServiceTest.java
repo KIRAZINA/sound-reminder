@@ -211,11 +211,35 @@ class StorageServiceTest {
     }
 
     @Test
-    @DisplayName("getBaseDir returns correct path")
-    void testGetBaseDir() {
-        Path baseDir = storageService.getBaseDir();
-        assertNotNull(baseDir);
-        assertTrue(baseDir.endsWith(".soundreminder"));
-        assertTrue(Files.exists(baseDir));
+    @DisplayName("resolveImagePath rejects traversal and absolute paths")
+    void testResolveImagePathRejectsUnsafe() {
+        assertNull(storageService.resolveImagePath("../../etc/passwd"));
+        assertNull(storageService.resolveImagePath("/etc/passwd"));
+        assertNull(storageService.resolveImagePath("C:\\Windows\\win.ini"));
+    }
+
+    @Test
+    @DisplayName("Backup export/import round trip")
+    void testBackupRoundTrip(@TempDir Path tempDir) throws IOException {
+        Reminder r = new Reminder(ReminderType.SCHEDULED,
+                LocalDateTime.now().plusHours(1), "Backup reminder", null);
+        storageService.saveReminders(List.of(r));
+        AppSettings settings = new AppSettings("/x.wav", 0.5);
+        storageService.saveSettings(settings);
+
+        Path zip = tempDir.resolve("backup.zip");
+        storageService.exportBackup(zip);
+        assertTrue(Files.exists(zip));
+
+        storageService.saveReminders(List.of());
+        storageService.saveSettings(new AppSettings());
+
+        storageService.importBackup(zip);
+
+        List<Reminder> loaded = storageService.loadReminders();
+        assertEquals(1, loaded.size());
+        assertEquals("Backup reminder", loaded.get(0).getMessage());
+        AppSettings loadedSettings = storageService.loadSettings();
+        assertEquals("/x.wav", loadedSettings.getCustomSoundPath());
     }
 }
