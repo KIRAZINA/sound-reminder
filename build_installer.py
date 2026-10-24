@@ -53,7 +53,9 @@ def main():
                 break
 
     if not java_home or not os.path.exists(os.path.join(java_home, "bin", "jpackage.exe")):
-        java_bin = shutil.which("java")
+        jpackage_path = shutil.which("jpackage")
+        if jpackage_path:
+            java_home = os.path.dirname(os.path.dirname(jpackage_path))
         if java_bin:
             jdk_base = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "Java")
             if os.path.exists(jdk_base):
@@ -166,4 +168,10 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as e:
+        sys.exit(e.code)
+    except Exception as e:
+        print(f"ERROR: Unexpected failure: {e}")
+        sys.exit(1)
