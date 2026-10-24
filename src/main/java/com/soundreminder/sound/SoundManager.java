@@ -85,8 +85,12 @@ public class SoundManager {
             }
 
             LOGGER.info("Alarm started, volume: " + settings.getVolume());
-        } catch (LineUnavailableException | IOException | UnsupportedAudioFileException e) {
-            LOGGER.log(Level.SEVERE, "Failed to start alarm", e);
+        } catch (LineUnavailableException | IOException | UnsupportedAudioFileException | IllegalArgumentException e) {
+            if (e instanceof IllegalArgumentException) {
+                LOGGER.log(Level.WARNING, "Audio line unsupported or headless environment detected, suppressing audio playback.");
+            } else {
+                LOGGER.log(Level.SEVERE, "Failed to start alarm", e);
+            }
         }
     }
 
@@ -114,7 +118,11 @@ public class SoundManager {
      * @return true if the alarm is active, false otherwise
      */
     public boolean isPlaying() {
-        return activeClip != null && activeClip.isRunning();
+        try {
+            return activeClip != null && activeClip.isRunning();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

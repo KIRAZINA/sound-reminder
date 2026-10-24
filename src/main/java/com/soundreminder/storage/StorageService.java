@@ -247,8 +247,14 @@ public class StorageService {
         if (imagePath == null || imagePath.isBlank()) {
             return null;
         }
+        if (imagePath.contains("\\") || imagePath.matches("^[a-zA-Z]:.*")) {
+            return null;
+        }
         Path path = Path.of(imagePath).normalize();
         if (path.isAbsolute()) {
+            return null;
+        }
+        if (path.toString().contains("..")) {
             return null;
         }
         Path resolved = baseDir.resolve(path).normalize();
