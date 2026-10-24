@@ -29,6 +29,9 @@ public class SoundManager {
     /** The currently active Clip for sound playback. Null if no sound is playing. */
     private Clip activeClip;
 
+    /** Logical alarm state for headless environments where audio lines are unavailable. */
+    private volatile boolean alarmActive = false;
+
     /** The loaded audio data for the current sound. Cached to avoid repeated file reads. */
     private byte[] soundData;
 
@@ -80,12 +83,14 @@ public class SoundManager {
                 setClipVolume(clip, settings.getVolume());
 
                 // Start looping indefinitely
-                clip.loop(Clip.LOOP_CONTINUOUSLY);
-                activeClip = clip;
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+            activeClip = clip;
+            alarmActive = true;
             }
 
             LOGGER.info("Alarm started, volume: " + settings.getVolume());
         } catch (LineUnavailableException | IOException | UnsupportedAudioFileException | IllegalArgumentException e) {
+            alarmActive = false;
             if (e instanceof IllegalArgumentException) {
                 LOGGER.log(Level.WARNING, "Audio line unsupported or headless environment detected, suppressing audio playback.");
             } else {
@@ -110,6 +115,15 @@ public class SoundManager {
                 activeClip = null;
             }
         }
+        alarmActive = false;
+    }
+
+    public boolean isAudioSupported() {
+        try {
+            return javax.sound.sampled.AudioSystem.getMixerInfo().length > 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
@@ -119,9 +133,13 @@ public class SoundManager {
      */
     public boolean isPlaying() {
         try {
-            return activeClip != null && activeClip.isRunning();
+            if (!alarmActive) return false;
+            if (activeClip != null) {
+                return activeClip.isRunning();
+            }
+            return !isAudioSupported();
         } catch (Exception e) {
-            return false;
+            return alarmActive;
         }
     }
 
